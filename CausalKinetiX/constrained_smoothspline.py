@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.interpolate import  BSpline
 from matplotlib import pyplot as plt
-from BSbasis import get_BSbasis, get_basis_matrix, get_deriv_matrix, get_penalty_matrix
+from .BSbasis import get_BSbasis, get_basis_matrix, get_deriv_matrix, get_penalty_matrix
 import numbers
 from quadprog import solve_qp
 from scipy.optimize import minimize 

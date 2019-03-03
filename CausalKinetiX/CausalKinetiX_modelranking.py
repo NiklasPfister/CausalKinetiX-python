@@ -12,8 +12,8 @@ from sklearn.ensemble import RandomForestRegressor
 from quadprog import solve_qp
 from matplotlib import pyplot as plt
 from copy import deepcopy
-from constrained_smoothspline import constrained_smoothspline
-from utils import extend_Dmat
+from .constrained_smoothspline import constrained_smoothspline
+from .utils import extend_Dmat
 
 
 # In[2]:

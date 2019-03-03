@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.stats
-from CausalKinetiX_modelranking import CausalKinetiX_modelranking
-from utils import construct_models
+from .CausalKinetiX_modelranking import CausalKinetiX_modelranking
+from .utils import construct_models
 
 
 def CausalKinetiX(D,
@@ -48,7 +48,7 @@ def CausalKinetiX(D,
 
     # check whether parameter K was specified
     if K==None:
-        warning("K was not specified and the default does not make sense for arbitrary lists of models. It was set to 1, but this can invalidate the variable ranking.")
+        print("K was not specified and the default does not make sense for arbitrary lists of models. It was set to 1, but this can invalidate the variable ranking.")
         K = 1
 
     ###
