@@ -1,108 +1,252 @@
+import numbers
 import numpy as np
-import scipy.interpolate 
+from glmnet import ElasticNet
+import numbers
+from itertools import combinations
 
-# supposing that data point is defined in advance
-# PP...Piecewise Polynomial
-# supposing that data point is defined in advance
-class PP_Cubic:
+####
+# Small helper functions that are not exported
+###
+
+##' @import utils glmnet
+
+## Lasso based on deltaY vs intX
+def ode_integratedlasso_rank_vars(D,
+                                  times,
+                                  target,
+                                  env=None,
+                                  silent=True,
+                                  interactions=True,
+                                  rm_target=True,
+                                 ):
     
-    def __init__(self, idx, knots, coefs):
-        assert(len(knots)==5)
-        assert(type(knots)==np.ndarray)
-        assert(coefs.shape==(4,4))
-        assert((knots[:-1]>knots[1:]).sum()==0) # check if sorted
-        self.idx = idx
-        self.knots = knots
-        self.coefs = coefs #[piece_id, term_order]
-        
-    def __call__(self, vec):
-        assert(type(vec)==np.ndarray)
-        def eval_PP(x):
-            if not (self.knots[0]<=x and x<=self.knots[4]):
-                return 0
-            elif (self.knots[0]<=x and x<=self.knots[1]):
-                return sum(self.coefs[0,k]*(x-self.knots[0])**(3-k) for k in range(4))
-            elif (self.knots[1]<=x and x<=self.knots[2]):
-                return sum(self.coefs[1,k]*(x-self.knots[1])**(3-k) for k in range(4))
-            else:
-                idx =  min(3, (self.knots<=x).sum() - 1 )
-                return sum(self.coefs[idx,k]*(x-self.knots[idx])**(3-k) for k in range(4))
-        return np.vectorize(eval_PP,otypes=[np.float])(vec) 
+    L = len(times)
+    d = D.shape[1]//L
+    n = D.shape[0]
 
-    # define method for penalty term
-    # e.g. differenciate both basis twice and multiply and integrate over the domain of the data 
-    def __mod__(PP1,PP2):
-        # for broadcasting  
-        
-        if np.abs(PP1.idx - PP2.idx)>3:
-            return 0.
-        
-        def conv(A,B):
-            #for utility
-            #multiplication of polinomials are equivalent to convolution of the coefficient vector
-            return np.array([np.convolve(a,b) for (a,b) in zip(A,B)])
-        
-        PP1 = PP1.differentiate().differentiate()
-        PP2 = PP2.differentiate().differentiate()
-        
-        if PP1.idx<PP2.idx:
-            prod_coefs = np.zeros([4,4])
-            prod_coefs[PP2.idx-PP1.idx:,1:] = conv(PP1.coefs[PP2.idx-PP1.idx:,2:], PP2.coefs[:PP1.idx-PP2.idx,2:])
-            # "[,2:]"...second derivative is polynomial of degree 1 (order 2). 
-            # So coefficients of the higher degrees can be ignored.
-        elif PP1.idx==PP2.idx:
-            prod_coefs = np.zeros([4,4])
-            prod_coefs[:,1:] = conv(PP1.coefs[:,2:], PP2.coefs[:,2:])
-            # "[,2:]"...second derivative is polynomial of degree 1 (order 2). 
-            # So coefficients of the higher degrees can be ignored.
-        elif PP1.idx>PP2.idx:
-            prod_coefs = np.zeros([4,4])
-            prod_coefs[:PP2.idx-PP1.idx,1:] = conv(PP1.coefs[:PP2.idx-PP1.idx,2:], PP2.coefs[PP1.idx-PP2.idx:,2:])
-            # "[,2:]"...second derivative is polynomial of degree 1 (order 2). 
-            # So coefficients of the higher degrees can be ignored.
+    Xint = np.zeros([(L-1)*n, d])
+    deltaY = np.zeros([(L-1)*n])
+    for i in range(n):
+        deltaY[(i)*(L-1):(i+1)*(L-1)] = np.diff(D[i, target*L:(target+1)*L])
+    for j in range(d):
+        for i in range(n):
+            tmp = D[i, j*L:(j+1)*L]
+            Xint[i*(L-1):(i+1)*(L-1),j] = (tmp[:(L-1)]+tmp[1:])/2*np.diff(times)
+
+    # remove NAs
+    na_ind = np.logical_or(np.isnan(deltaY), (np.isnan(Xint)>0).sum(axis=1))
+    deltaY = deltaY[~na_ind]
+    Xint = Xint[~na_ind,]
+
+    # Perform lasso
+    if interactions==True:
+        dC2 = d*(d-1)//2 #combination
+        var_names = np.zeros([d+dC2+d], dtype=np.object)
+        var_names[:d] = np.array([[]]+[[i] for i in range(d)], dtype=np.object)[1:]
+        var_names[d:] = np.array([[]]+sum(([[i,j] for j in range(i+1)] for i in range(d)),[]), dtype=np.object)[1:]
+        Xint_interactions = np.zeros([n*(L-1), len(var_names)])
+        Xint_interactions[:,:d] = Xint
+        for i in range(d,len(var_names)):
+            Xint_interactions[:,i] = Xint[:,var_names[i][0]] * Xint[:,var_names[i][1]]
+        fit = ElasticNet().fit(Xint_interactions, deltaY)
+        sel_matrix = (np.abs(fit.coef_path_) > 1e-7)
+        first_entrance = sel_matrix.max(axis=1)
+        # find all rows without ones and set first entrance to Inf
+        first_entrance[sel_matrix.sum(axis=1) == 0] = np.infty
+        ranking = first_entrance.argsort()
+        ranking = var_names[ranking]
+    else:
+        fit = ElasticNet(Xint, deltaY)
+        sel_matrix = fit.coef_path_ != 0
+        first.entrance = sel._atrix.max(axis=1)
+        # find all rows without ones and set first entrance to Inf
+        first_entrance[sel_matrix.sum(axis=1) == 0] = np.infty
+        ranking = first_entrance.argsort()
+        ranking = var_names[ranking]
+    if rm_target==True:
+        ranking = ranking[ranking != target]
+    
+    return({'ranking':ranking, 'coef':fit.coef_})
+
+
+def construct_models(D, L, d, n, target, times,
+                             maineffects_models, screening,
+                             interactions, products, include_vars,
+                             max_preds, expsize, env=None):
+
+    ## Main-Effect and Full-Effect models depends on maineffects_models
+    if not maineffects_models==True:
+    # construct variable vector
+        if not include_vars==None:
+            include_vars = np.array(include_vars)
+            # for utility
+            unmatch = lambda pattern, matched: \
+                np.arange(len(matched))[np.equal(
+                    np.array(pattern).reshape([-1,1]), 
+                    np.array(matched).reshape([1,-1])
+                ).sum(axis=0)==0]
+            vv = unmatch(
+                include_vars[include_vars>=0],
+                np.arange(d)
+            )
+            print()
         else:
-            raise(Exception(""))
-        
-        total = 0
-        for i in range(4):
-            total -= np.poly1d(prod_coefs[i,:]).integ()(0)
-            total += np.poly1d(prod_coefs[i,:]).integ()(PP1.knots[i+1]-PP1.knots[i])
-        return total
-            
-    def differentiate(self):
-        out_coefs = np.zeros([4,4])
-        for i in range(4):
-            tmp_coef = np.poly1d(self.coefs[i,:]).deriv().coefficients
-            out_coefs[i,4-len(tmp_coef):] = tmp_coef
-        return PP_Cubic(self.idx, self.knots, out_coefs)            
-    def differentiate(self):
-        out_coefs = np.zeros([4,4])
-        for i in range(4):
-            tmp_coef = np.poly1d(self.coefs[i,:]).deriv().coefficients
-            out_coefs[i,4-len(tmp_coef):] = tmp_coef
-        return PP_Cubic(self.idx, self.knots, out_coefs)
-    
-def get_BSbasis(data):
-    assert(type(data)==np.ndarray)
-    data_padded = np.concatenate([[data[0]]*3, data, [data[-1]]*3])
-    basis = np.zeros([len(data)-2+4], dtype=np.object)   
-    for i in range(len(data)-2+4):
-        Bbasis = scipy.interpolate.BSpline.basis_element(data_padded[i:i+5])
-        Bbasis = scipy.interpolate.PPoly.from_spline(Bbasis)
-        coefs_shifted = Bbasis.c.T[3:7]
-        basis[i] = PP_Cubic(idx=i, knots=data_padded[i:i+5], coefs=Bbasis.c.T[3:7])
-    return basis
+            vv = np.arange(d)
 
-def get_basis_matrix(data, BSbasis):
-    return np.array([basis(data) for basis in BSbasis]).T
+        ## Decide which terms to keep depending on screening, interactions and products
+        if type(screening)==numbers.Number:
+            tmp = extend_Dmat(D, L, d, n, products, interactions, include_vars)
+            Dfull = tmp["Dnew"]
+            ordering = tmp["ordering"]
+            res = ode_integratedlasso_rank_vars(Dfull,
+                                               times,
+                                               target,
+                                               env=env,
+                                               interactions=False,
+                                               rm_target=False
+                                               )["ranking"]
+            keep_terms = ordering[res[range(screening)]]
+            ## print(keep_terms)
+            num_terms = screening
+        else:
+            keep_terms = [[v] for v in vv]
+            tmp_terms = []
+            # add interactions
+            if interactions==True:
+                tmp_terms += [list(tupl) for tupl in combinations(list(vv), 2)]
+            # add products
+            if products==True:
+                keep_terms += [[i,i] for i in vv]
+            # include_vars
+            if not include_vars==None:
+                keep_terms_new = []
+                for i in range(len(keep_terms)):
+                    for var in include_vars:
+                        if var < 0:
+                            keep_terms_new.append(keep_terms[i])
+                        else:
+                            tmp_term = [var] + keep_terms[i]
+                            tmp_term.sort()
+                            print(tmp_term)
+                            keep_terms_new.append(tmp_term)
+                keep_terms = keep_terms_new + [[term] for term in include_vars]
+            num_terms = len(keep_terms)
 
-def get_deriv_matrix(data, BSbasis):
-    BSderiv = np.zeros_like(BSbasis)
-    for i in range(len(BSbasis)):
-        BSderiv[i] = BSbasis[i].differentiate()
-    return np.array([deriv(data) for deriv in BSderiv]).T
+        ## Construct models
+        if max_preds==True:
+            models = []
+            for k in range(1, expsize+1):
+                models += [list(tupl) for tupl in combinations(keep_terms, k)]
+        else:
+            models = [list(tupl) for tupl in combinations(keep_terms, expsize+1)]
+    else:
+        if not include_vars==None:
+            print("include_vars is not defined for maineffects_models==FALSE")
+        ## Construct models
+        if max_preds==True:
+            models = []
+            for k in range(1,expsize+1):
+                models += [list(tupl) for tupl in combinations(np.arange(d), k)]
+        else:
+            models = [list(tupl) for tupl in combinations(np.arange(d), expsize+1)]
+        # add interactions and products
+        for i in range(len(models)):
+            if len(models[i])==1:
+                models[i] = [models[i]]
+            if len(models[i])>1:
+                tmp_model = []
+                if interactions==True:
+                    tmp_model += [list(tupl) for tupl in combinations(models[i], 2)]
+                if products==True:
+                    tmp_model += [[i,i] for i in models[i]]
+                models[i] = [[term] for term in models[i]] + tmp_model
+    num_terms = d  
 
-def get_penalty_matrix(BSbasis):
-    BSbasis = np.reshape(BSbasis, [len(BSbasis), 1])
-    return (BSbasis%BSbasis.T).astype(np.float64)
+    # return output
+    result = {"models":models,
+              "num_terms":num_terms}
+    return result
 
+
+
+
+def extend_Dmat(D, L, d, n,
+                products,
+                interactions,
+                include_vars):
+
+    ### include_vars is supported in different way from R implementation now
+    ### include_var[i] < 0 indicates the original variable (not include_var[i] == 0)
+    assert(type(L)==type(d)==type(n)==int)
+
+    if not include_vars==None:# different from implementation in R
+        # construct variable vector
+        include_vars = np.array(include_vars)
+        # for utility
+        unmatch = lambda pattern, matched: \
+            np.arange(len(matched))[np.equal(
+                np.array(pattern).reshape([-1,1]), 
+                np.array(matched).reshape([1,-1])
+            ).sum(axis=0)==0]
+        vv = unmatch(
+            include_vars[include_vars<0],
+            np.arange(d)
+        )
+        vv_ind = np.array(sum([list(range(var*L, (var+1)*L)) for var in vv],[]))
+    else:
+        vv = np.arange(d)
+        vv_ind = np.arange(L*d)
+    dnew = len(vv)
+
+    # initialize
+    dC2 = dnew*(dnew-1)//2 #combination
+    num_vars = dnew + products*dnew + interactions*(dC2+d)
+    Dnew = np.zeros([n, L*num_vars])
+    Dnew[:,range(dnew*L)] = D[:,vv_ind]
+    ordering = np.zeros([num_vars], dtype=np.object)
+    for i in range(dnew):
+        ordering[i] = [vv[i]]
+    count = dnew
+
+    # add interactions
+    if interactions==True:
+        for i in range(dnew):
+            indi = np.arange(vv[i]*L,(vv[i]+1)*L)
+            for j in range(i,dnew):
+                ordering[count] = [vv[i], vv[j]]
+                indj = np.arange(vv[j]*L, (vv[j]+1)*L)
+                Dnew[:,np.arange(count*L, (count+1)*L)] = D[:, indi]*D[:, indj]
+                count = count+1
+
+    # add products
+    if(products):
+        for i in range(dnew):
+            indi = np.arange(vv[i]*L, (vv[i]+1)*L)
+            ordering[count] = [vv[i], vv[i]]
+            Dnew[:,count*L:(count+1)*L] = D[:, indi]**2
+            count = count + 1
+
+    # include variables to every term
+    if not include_vars==None:
+        Dfinal = np.zeros([Dnew.shape[0], len(include_vars)*Dnew.shape[1]+sum(include_vars!=0)*L])
+        ordering_final = np.zeros([len(include_vars)*len(ordering)+sum(include_vars!=0)], dtype=np.object)
+        count = 0
+        for var in include_vars:
+            Dfinal[: ,range(count*L,(count+1)*L)] = D[: ,range(var*L,(var+1)*L)]
+            ordering_final[count] = var
+            count = count + 1
+        for j in range(len(ordering)):
+            for var in include_vars:
+                if var < 0:
+                    ordering_final[count] = ordering[j]
+                    Dfinal[:,range(count*L,(count+1)*L)] = Dnew[:,range(j*L,(j+1)*L)]
+                else:
+                    tmp_order = np.append(ordering[j], var)
+                    tmp_order.sort()
+                    ordering_final[count] = list(tmp_order)
+                    Dfinal[:,range(count*L,(count+1)*L)] = D[:,range(var*L,(var+1)*L)] * Dnew[:,range(j*L,(j+1)*L)]
+                count = count + 1
+        ordering = ordering_final
+        Dnew = Dfinal
+
+    return({"Dnew":Dnew,"ordering":ordering})
