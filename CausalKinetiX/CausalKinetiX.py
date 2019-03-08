@@ -25,6 +25,8 @@ def CausalKinetiX(D,
         interactions = False
         interactions_Y = False
         include_intercept <- False
+    if regression_class == None:
+        regression_class = 'OLS'
     
     # read out variables
     n = D.shape[0]
@@ -55,7 +57,15 @@ def CausalKinetiX(D,
     # Compute model scores
     ###
 
-    model_scores = CausalKinetiX_modelranking(D, times, env, target, models, include_vars=include_vars)
+    model_scores = CausalKinetiX_modelranking(
+        D, 
+        times, 
+        env, 
+        target, 
+        models, 
+        include_vars = include_vars,
+        regression_class = regression_class,
+    )
 
     ###
     # Rank variables

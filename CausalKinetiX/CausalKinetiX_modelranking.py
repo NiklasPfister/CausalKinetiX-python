@@ -257,8 +257,9 @@ def CausalKinetiX_modelranking(
                 Yb[i] = fit["smooth_vals_new"]
 
             dYlist[i] = fit["smooth_deriv"]
-            # compute differences for intergrated model fit
-            if(integrated_model):
+            
+             # compute differences for intergrated model fit
+            if integrated_model==True:
                 dYlist[i] = Ylist[i][1:] - Ylist[i][:-1]
 
             # fit the reference model and compute penalty par and RSS
@@ -314,7 +315,7 @@ def CausalKinetiX_modelranking(
             model_index = []
         else:
             # for utility
-            match = lambda pattern, matched:             np.arange(len(matched))[np.equal(
+            match = lambda pattern, matched: np.arange(len(matched))[np.equal(
                     np.array([[]]+list(pattern))[1:].reshape([-1,1]), 
                     np.array([[]]+list(matched))[1:].reshape([1,-1])
                 ).sum(axis=0)>0]
@@ -350,7 +351,7 @@ def CausalKinetiX_modelranking(
                     Xlist2[i] = tmp * np.array(list(np.diff(times))*tmp.shape[1]).reshape(L-1, tmp.shape[1])
                     if include_intercept==True:
                         Xlist2[i] = np.concatenate([Xlist2[i], np.ones([L-1,1])], axis=1)
-            data_list2[model] = deepcopy(Xlist2)
+            data_list2[model] = Xlist2
 
 
     ######################################
@@ -456,8 +457,6 @@ def CausalKinetiX_modelranking(
             else:
                 raise(Exception("Specified regression_class does not exist_ Use OLS, OLS_prune or random_forest_"))
         # fitting section ends here
-
-
         # compute score using splitting environment
             if smooth_Y==False:
                 for i in range(num_env):
@@ -481,9 +480,10 @@ def CausalKinetiX_modelranking(
 
                         ### PLOT
                         if show_plot==True:
-                            constrained_fit[count] = fit["smooth_vals_new"]    
-                        count = count+1
-
+                            idx = np.arange(len(splitting_env))[splitting_env==unique_env[i]][j]
+                            constrained_fit[idx] = fit["smooth_vals_new"]
+                        count += 1
+                        
             else:
                 for i in range(num_env):
                     num_reps = sum(splitting_env==unique_env[i])
@@ -513,10 +513,14 @@ def CausalKinetiX_modelranking(
                         env_ind = (splitting_env == unique_env[i])
                         Y1plot = Ylist[env_ind]
                         times1 = np.array(list(times)*sum(env_ind))
-                        miny = min(np.concatenate([Y1plot, Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]]))
-                        maxy = max(np.concatenate([Y1plot, Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]]))
+                        # for utility
+                        min_ = lambda ary_obj:min([min(obj) for obj in ary_obj])
+                        max_ = lambda ary_obj:max([max(obj) for obj in ary_obj])
+                        miny = min(min_(tmp) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
+                        maxy = max(max_(tmp) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
+                        
                         # plot
-                        plt.plot(times1, Y1plot)
+                        plt.plot(times1, Y1plot,'o',c='black')
                         plt.xlabel("times")
                         plt.ylabel("concentration")
                         plt.ylim([miny, maxy])
@@ -525,18 +529,21 @@ def CausalKinetiX_modelranking(
                             plt.plot(times_new, Ya[k], 'l', c="red")
                             plt.plot(times_new, Yb[k], 'l', c="blue")
                             plt.plot(times_new, constrained_fit[[k]], 'l', c="green")
-                    #readline("Press enter")
+                        #readline("Press enter")
+                        plt.show()
 
                 else:
                     for i in range(num_env):
                         env_ind = (splitting_env == unique_env[i])
                         times1 = np.array(list(times)*sum(env_ind))
                         L = len(times)
-                        miny = min(np.concatenate([Y1plot, Ya[i], Yb[i], constrained_fit[i]]))
-                        maxy = max(np.concatenate([Y1plot, Ya[i], Yb[i], constrained_fit[i]]))
-
+                        min_ = lambda ary_obj:min([min(obj) for obj in ary_obj])
+                        max_ = lambda ary_obj:max([max(obj) for obj in ary_obj])
+                        miny = min(min_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
+                        maxy = max(max_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
+                        
                         # plot
-                        plt.plot(times1, Y1plot)
+                        plt.plot(times1, Ylist[i],'o',c='black')
                         plt.xlabel("times")
                         plt.ylabel("concentration")
                         plt.ylim([miny, maxy])
@@ -545,8 +552,9 @@ def CausalKinetiX_modelranking(
                             plt.plot(times_new, Ya[i], 'l', c="red")
                             plt.plot(times_new, Yb[i], 'l', c="blue")
                             plt.plot(times_new, constrained_fit[[i]], 'l', c="green")
-                    #readline("Press enter")
-
+                        #readline("Press enter")
+                        plt.show()
+                    
         elif sample_splitting=="loo":
             ###
             # With leave-one-out sample splitting
@@ -558,7 +566,10 @@ def CausalKinetiX_modelranking(
             RSS3_B = np.zeros([len(RSS_A)])
             X = np.concatenate(Xlist)
             dY = np.array(list(dYlist)).reshape([-1])
-            subenv_ind = [np.array(list(range(sum(splitting_env==unique_env[k])))*L) for k in range(num_env)]
+            
+# fixed from the following line, might be the cause of bug
+#           subenv_ind = [np.array(list(range(sum(splitting_env==unique_env[k])))*L) for k in range(num_env)]
+            subenv_ind = [np.repeat(list(range(sum(splitting_env==unique_env[k]))),L) for k in range(num_env)]
             loo_ind = np.repeat(list(splitting_env), L)
             # adjust for missing obs in integrated model fit
             if 'Xlist2' in locals(): # check if 'Xlist2' is defined
@@ -651,6 +662,7 @@ def CausalKinetiX_modelranking(
                             np.isnan(Ylist[count]),
                             np.isnan(Xin[subenv_ind[i]==j,:]>0).sum(axis=1)
                         )
+    
                         fitted_dY_tmp = fitted_dY[subenv_ind[i]==j]
                         fit = constrained_smoothspline(Ylist[count][~na_ind],
                                                         times[~na_ind],
@@ -665,11 +677,13 @@ def CausalKinetiX_modelranking(
                         RSS_B[count] = sum(fit["residuals"]**2)
                         UpDown_B[count] = fit["smooth_vals"][len(fit["smooth_vals"])-1]
                         RSS3_B[count] = sum(fit["residuals"][[1, int(len(fit['residuals'])/2), len(fit['residuals'])-1]]**2)
+                    
                         ### PLOT
                         if show_plot==True:
-                            constrained_fit[count] = fit["smooth_vals_new"]
-                        count = count+1
-
+                            idx = np.arange(len(splitting_env))[splitting_env==unique_env[i]][j]
+                            constrained_fit[idx] = fit["smooth_vals_new"]
+                        count +=1
+                        
                 else:
                     len_env = sum(splitting_env==unique_env[i])
                     fitted_dY_tmp = fitted_dY.reshape([L,-1]).mean(axis=1)
@@ -695,35 +709,48 @@ def CausalKinetiX_modelranking(
                         env_ind = (splitting_env == unique_env[i])
                         Y1plot = np.array(list(Ylist[env_ind])).reshape([-1])
                         times1 = np.array(list(times)*sum(env_ind))
-                        miny = min(min(tmp[0]) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
-                        maxy = max(max(tmp[0]) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
+                        # for utility
+                        min_ = lambda ary_obj:min([min(obj) for obj in ary_obj])
+                        max_ = lambda ary_obj:max([max(obj) for obj in ary_obj])
+                        miny = min(min_(tmp) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
+                        maxy = max(max_(tmp) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
 
                         # plot
-                        plt.plot(times1, Y1plot)
+                        plt.plot(times1, Y1plot,'o',c='black')
                         plt.xlabel("times")
                         plt.ylabel("concentration")
                         plt.ylim([miny, maxy])
 
-                        for k in range(sum(env_ind)):
+                        which_ind = np.arange(len(splitting_env))[env_ind]
+                        for k in which_ind:
                             plt.plot(times_new, Ya[k], '-', c="red")
                             plt.plot(times_new, Yb[k], '-', c="blue")
                             plt.plot(times_new, constrained_fit[k], '-', c="green")
-                        which_ind = np.arange(len(splitting_env))[env_ind]
                         #print(str(Ya))
                         #readline("Press enter")
+                        plt.show()
 
                 else:
                     env_ind = splitting_env == unique_env[i]
                     times1 = np.array(list(times)*sum(env_ind))
                     L = len(times)
-                    miny = min(min(tmp[0]) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
-                    maxy = max(max(tmp[0]) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
+                    # for utility
+                    min_ = lambda ary_obj:min([min(obj) for obj in ary_obj])
+                    max_ = lambda ary_obj:max([max(obj) for obj in ary_obj])
+                    miny = min(min_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
+                    maxy = max(max_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
                     # plot
+                    plt.plot(times1, Ylist[i],'o',c='black')
+                    plt.xlabel("times")
+                    plt.ylabel("concentration")
+                    plt.ylim([miny, maxy])
+
                     for k in range(sum(env_ind)):
                         plt.plot(times_new, Ya[k], '-', c="red")
                         plt.plot(times_new, Yb[k], '-', c="blue")
                         plt.plot(times_new, constrained_fit[k], '-', c="green")
                     #readline("Press enter")
+                    plt.show()
 
         else:
             raise(Exception("Specified sample_splitting does not exist_ Use none or loo_"))
@@ -734,7 +761,10 @@ def CausalKinetiX_modelranking(
 
         elif score_type=="mean":
             score = np.mean((RSS_B-RSS_A)/RSS_A)
-
+# for debug
+            #print(RSS_A)
+            #print(RSS_B)
+            #print(RSS_B-RSS_A)
         elif score_type=="mean2":
             score = np.mean(RSS_B)
 
