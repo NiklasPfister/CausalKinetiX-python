@@ -35,7 +35,7 @@ def CausalKinetiX_modelranking(
         regression_class = "OLS",
         sample_splitting = "loo",
         score_type = "mean",
-        integrated_model = True,
+        integrated_model = False,#True,
         splitting_env = None,
         weight_vec = None,
         set_initial = False,

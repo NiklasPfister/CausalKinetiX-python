@@ -56,7 +56,8 @@ def CausalKinetiX(D,
     ###
     # Compute model scores
     ###
-
+    
+    
     model_scores = CausalKinetiX_modelranking(
         D, 
         times, 
@@ -73,12 +74,12 @@ def CausalKinetiX(D,
 
     Mlen = len(models)
     Mjlen = np.array([
-                    sum(sum([[(x in term) for term in mod] for mod in models],[]))
+                    sum(sum([[([x] == term) for term in mod] for mod in models],[]))
                 for x in range(d)])
     # compute p-values based on hypergeometric distribution
     best_mods = np.array([[]]+models, dtype=np.object)[1:][model_scores.argsort()][range(K)]
     counts = np.array([
-                        sum(sum([[(x in term) for term in mod] for mod in best_mods],[]))
+                        sum(sum([[[x] == term for term in mod] for mod in best_mods],[]))
                     for x in range(d)])
     var_scores = (1./K) * counts
     var_pvals = np.array([
@@ -96,4 +97,5 @@ def CausalKinetiX(D,
     return({"models":models,
           "model_scores":model_scores,
           "variable_scores":scores,
-          "ranking":ranking})
+          "ranking":ranking,
+          "others":(counts, Mlen, Mjlen, K)})

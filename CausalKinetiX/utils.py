@@ -56,13 +56,12 @@ def ode_integratedlasso_rank_vars(D,
         ranking = first_entrance.argsort()
         ranking = var_names[ranking]
     else:
-        fit = ElasticNet(Xint, deltaY)
+        fit = ElasticNet().fit(Xint, deltaY)
         sel_matrix = fit.coef_path_ != 0
-        first.entrance = sel._atrix.max(axis=1)
+        first_entrance = sel_matrix.max(axis=1)
         # find all rows without ones and set first entrance to Inf
         first_entrance[sel_matrix.sum(axis=1) == 0] = np.infty
         ranking = first_entrance.argsort()
-        ranking = var_names[ranking]
     if rm_target==True:
         ranking = ranking[ranking != target]
     
@@ -94,7 +93,7 @@ def construct_models(D, L, d, n, target, times,
             vv = np.arange(d)
 
         ## Decide which terms to keep depending on screening, interactions and products
-        if type(screening)==numbers.Number:
+        if type(screening)==int:
             tmp = extend_Dmat(D, L, d, n, products, interactions, include_vars)
             Dfull = tmp["Dnew"]
             ordering = tmp["ordering"]
@@ -106,7 +105,7 @@ def construct_models(D, L, d, n, target, times,
                                                rm_target=False
                                                )["ranking"]
             keep_terms = ordering[res[range(screening)]]
-            ## print(keep_terms)
+            print(keep_terms)
             num_terms = screening
         else:
             keep_terms = [[v] for v in vv]
@@ -127,7 +126,6 @@ def construct_models(D, L, d, n, target, times,
                         else:
                             tmp_term = [var] + keep_terms[i]
                             tmp_term.sort()
-                            print(tmp_term)
                             keep_terms_new.append(tmp_term)
                 keep_terms = keep_terms_new + [[term] for term in include_vars]
             num_terms = len(keep_terms)
@@ -160,7 +158,7 @@ def construct_models(D, L, d, n, target, times,
                 if products==True:
                     tmp_model += [[i,i] for i in models[i]]
                 models[i] = [[term] for term in models[i]] + tmp_model
-    num_terms = d  
+        num_terms = d  
 
     # return output
     result = {"models":models,
