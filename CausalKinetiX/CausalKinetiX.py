@@ -98,4 +98,4 @@ def CausalKinetiX(D,
           "model_scores":model_scores,
           "variable_scores":scores,
           "ranking":ranking,
-          "others":(counts, Mlen, Mjlen, K)})
+          "others(for dedug)":{"counts":counts, "Mlen":Mlen, "Mjlen":Mjlen, "K":K}})
