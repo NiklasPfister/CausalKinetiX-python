@@ -10,7 +10,7 @@ pen_degree : desired degree of the derivative in smoothing penalty.
 constraint : one of 'none', 'fixed' or 'bounded' depending on whether the derivatives should not be constrained, fixed to a constant or bounded in an interval, respectively.
 derivative_values : either a 1d-array with the same length as y if contraint=='fixed' or a matrix(2d-array) with 2 columns conatining the lower and upper bounds on the derivatives if contraint=='bounded'.
 initial_value : optional paramter that specifies an initial value of the spline incase it should be fixed.
-times_new : optional vector of new time points at which the spline should be evaluated.
+times_new : optional 1d-array of new time points at which the spline should be evaluated.
 num_folds : either an integer value of the number of folds or the string "leave-one-out" for a leave one out type cross-validation in determining the penalty parameter.
 lambda : either a float value if the penalty parameter is fixed explicitely or one of the values 'optim' or 'grid.search' depending on the desired optimization procedure.
 
