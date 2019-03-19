@@ -20,7 +20,7 @@ dict object with following keys and values
 "time" : 1d-array containing time points.
 "env" : specifying the experimental environment.
 "simulated_model" : object returned by ODE solver.
-"true_model" : vector specifying the target equation model.
+"true_model" : 1d-array specifying the target equation model.
 "target" : target variable.
 
 Examples

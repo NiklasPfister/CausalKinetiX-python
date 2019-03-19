@@ -20,8 +20,8 @@ regression_class : (default OLS) other options are signed.OLS, optim, random.for
 sample_splitting : (default "loo") either leave-one-out (loo) or no splitting (none).
 score_type : (default "mean") : specifies the type of score funtion to use.
 integrated_model : (default TRUE) specifies whether to fit the integrated or the derived model.
-splitting_env : (default NA) an additonal environment vector used for scoring.
-weight_vec : (default rep(1, length(env)) a weight vector used in the scoring. 
+splitting_env : (default NA) an additonal environment 1d-array used for scoring.
+weight_vec : (default rep(1, length(env)) a weight 1d-array used in the scoring. 
 set_initial : (default FALSE) specifies whether to fix the initial value.
 silent : (default TRUE) turn of additional output.
 show_plot (default FALSE) show diagnostic plots.
