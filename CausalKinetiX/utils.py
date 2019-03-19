@@ -1,12 +1,12 @@
+####
+# Small helper functions that are not exported
+###
+
 import numbers
 import numpy as np
 from glmnet import ElasticNet
 import numbers
 from itertools import combinations
-
-####
-# Small helper functions that are not exported
-###
 
 ##' @import utils glmnet
 

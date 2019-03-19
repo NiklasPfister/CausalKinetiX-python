@@ -1,3 +1,57 @@
+"""
+Fit a smoothing spline with constraints on derivatives
+
+Parameters
+----------
+
+y : 1d-array of response variables.
+times : 1d-array of time points at which y was measured, same length as y.
+pen_degree : desired degree of the derivative in smoothing penalty.
+constraint : one of 'none', 'fixed' or 'bounded' depending on whether the derivatives should not be constrained, fixed to a constant or bounded in an interval, respectively.
+derivative_values : either a 1d-array with the same length as y if contraint=='fixed' or a matrix(2d-array) with 2 columns conatining the lower and upper bounds on the derivatives if contraint=='bounded'.
+initial_value : optional paramter that specifies an initial value of the spline incase it should be fixed.
+times_new : optional vector of new time points at which the spline should be evaluated.
+num_folds : either an integer value of the number of folds or the string "leave-one-out" for a leave one out type cross-validation in determining the penalty parameter.
+lambda : either a float value if the penalty parameter is fixed explicitely or one of the values 'optim' or 'grid.search' depending on the desired optimization procedure.
+
+Returns
+-------
+dict object with following keys and values
+"smooth_vals" : predicted values at points times
+"residuals" : residuals
+"smooth_vals_new" : predicted values at time points times.new
+"smooth_deriv" : predicted derivative values at points times
+"pen_par" : penality parameter used for smoothing
+
+Examples
+--------
+## Generate data from Maillard reaction
+>>> simulation_obj = generate_data_targetmodel(env=np.array(list(range(5))*3),
+                                            L=15,
+                                            d=5,
+                                            noise_var=0.1)
+>>> D = simulation_obj["simulated_data"]
+>>> time = simulation_obj["time"]
+>>> env = simulation_obj["env"]
+>>> target = simulation_obj["target"]
+>>> fit = constrained_smoothspline(D[1,-len(time):],
+                                   time,
+                                   2,
+                                   constraint="none",
+                                   times_new=np.linspace(0,10,1001),
+                                   num_folds=2,
+                                   lambd="optim")
+>>> plt.plot(np.linspace(0,10,1001), fit["smooth_vals_new"])
+                                   
+Notes
+-----
+The function CausalKinetiX_modelranking can be used if the variable ranking is not required.
+For further details see the following references.
+Pfister, N., S. Bauer, J. Peters (2018).
+Identifying Causal Structure in Large-Scale Kinetic Systems
+(https://arxiv.org/pdf/1810.11776.pdf)
+"""
+
 import numpy as np
 from scipy.interpolate import  BSpline
 from matplotlib import pyplot as plt

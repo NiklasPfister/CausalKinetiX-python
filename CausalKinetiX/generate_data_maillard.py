@@ -1,3 +1,53 @@
+"""
+Generate sample data from the maillard model.
+
+Parameters
+----------
+
+target : integer specifing which variable is the target. needs to be an integer between 0 and 10.
+env : integer 1d-array of length n encoding to which experiment each repetition belongs. be aware that variable index starts from 0.
+L : number of time points for evaluation.
+intervention : type of intervention.
+intervention_par : parameters used in the interventions.
+ode.solver : specifies which ODE solver to use when solving ODE.
+seed : random seed.
+silent : set to FALSE if status output should be produced.
+
+Returns
+-------
+dict object with following keys and values
+"simulated_data" : D-matrix(2d-array) of noisy data.
+"time" : 1d-array containing time points.
+"env" : specifying the experimental environment.
+"simulated_model" : object returned by ODE solver.
+"true_model" : vector specifying the target equation model.
+"target" : target variable.
+
+Examples
+--------
+## Generate data from Maillard reaction
+>>> simulation_obj = generate_data_maillard(env=np.array(list(range(5))*3),
+                                        L=15,
+                                        target=0)
+>>> D = simulation_obj["simulated_data"]
+>>> time = simulation_obj["time"]
+>>> env = simulation_obj["env"]
+>>> target = simulation_obj["target"]
+>>> # plot the observation of target variable in environment 0
+>>> plt.plot(time, D[0,-len(time):], '-',c="black")
+>>> plt.plot(time, D[0,-len(time):], 'o',c="red")
+>>> plt.legend(["observations"])
+
+Notes
+-----
+The function CausalKinetiX_modelranking can be used if the variable ranking is not required.
+For further details see the following references.
+Pfister, N., S. Bauer, J. Peters (2018).
+Identifying Causal Structure in Large-Scale Kinetic Systems
+(https://arxiv.org/pdf/1810.11776.pdf)
+"""
+
+
 import numpy as np
 import numbers
 import scipy.integrate

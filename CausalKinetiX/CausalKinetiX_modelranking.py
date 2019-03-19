@@ -1,7 +1,65 @@
+"""
+Applies CausalKinetiX framework to rank variables and models according to their stability.
 
-# coding: utf-8
+Parameters
+----------
 
-# In[1]:
+D : data matrix(2d-array). Should have dimension n x (L*d), where n is the number of repetitions (over all experiments), L is the number of time points and d is the number of predictor variables.
+times : 1d-array of length L specifying the time points at which data was observed.
+env : integer 1d-array of length n encoding to which experiment each repetition belongs.
+target : integer specifing which variable is the target.
+models : list of models. Each model is specified by a list of lists specifiying the variables included in the interactions of each term. for example, [[0],[1,2]] stands for a model whose predictor variables are x0 and x1*x2
+pen_degree : (default 2) specifies the penalization degree in the smoothing spline.
+num.folds : (default 2) number of folds used in cross-validation of smoothing spline. 
+include_vars : (default NA) specifies variables that should be included in each model.
+include_intercept : (default FALSE) specifies whether to include a intercept in models.
+pooling : (default FALSE) specifies whether to pool repetitions in each environment.
+smoothing : (default FALSE) specifies whether to smooth data observations before fitting.
+smooth_Y : (default FALSE) specifies whether to smooth target observations before fitting. 
+regression_class : (default OLS) other options are signed.OLS, optim, random.forest.
+sample_splitting : (default "loo") either leave-one-out (loo) or no splitting (none).
+score_type : (default "mean") : specifies the type of score funtion to use.
+integrated_model : (default TRUE) specifies whether to fit the integrated or the derived model.
+splitting_env : (default NA) an additonal environment vector used for scoring.
+weight_vec : (default rep(1, length(env)) a weight vector used in the scoring. 
+set_initial : (default FALSE) specifies whether to fix the initial value.
+silent : (default TRUE) turn of additional output.
+show_plot (default FALSE) show diagnostic plots.
+
+Returns
+-------
+scores : 1d-array with the same length as models containing the stability scores. score_type="mean2" is used in Python implementation while "mean1" is used in R version. this causes the difference in scores between the two versions.
+
+Examples
+--------
+## Generate data from tergetmodel reaction
+>>> simulation_obj = generate_data_maillard(env=np.array(list(range(5))*3),
+                                        L=15,
+                                        target=0)
+>>> D = simulation_obj["simulated_data"]
+>>> time = simulation_obj["time"]
+>>> env = simulation_obj["env"]
+>>> target = simulation_obj["target"]
+>>> true_model = simulation_obj["true_model"]
+>>> models = [true_model]
+>>> # plot the observation of target variable in environment 0
+>>> plt.plot(time, D[0,-len(time):], '-',c="black")
+>>> plt.plot(time, D[0,-len(time):], 'o',c="red")
+>>> plt.legend(["observations"])
+>>> # output of following is random
+>>> CausalKinetiX_modelranking(D, time, env, target, models, 
+                           include_vars=None, show_plot=True, 
+                           integrated_model=False, score_type="mean2")
+array([0.00598046])
+
+Notes
+-----
+The function CausalKinetiX is a wrapper for this function that also computes the variable ranking. 
+For further details see the following references.
+Pfister, N., S. Bauer, J. Peters (2018).
+Identifying Causal Structure in Large-Scale Kinetic Systems
+(https://arxiv.org/pdf/1810.11776.pdf)
+"""
 
 
 import numpy as np
@@ -14,10 +72,6 @@ from matplotlib import pyplot as plt
 from copy import deepcopy
 from .constrained_smoothspline import constrained_smoothspline
 from .utils import extend_Dmat
-
-
-# In[2]:
-
 
 def CausalKinetiX_modelranking(
         D, 
