@@ -13,10 +13,10 @@ max_preds : (default FALSE) if TRUE also models with lower terms included.
 expsize : (default 2) the expected number of terms.
 interactions : (default FALSE) specifies whether to include interactions in the models.
 products : (default FALSE) specifies whether to include products in the models.
-include_vars : (default NA) specifies variables that should be included in each model. 
+include_vars : (default None) specifies variables that should be included in each model. use -1 for using original variables(e.g. include_var=-1 returns same result as inculude_var=None). 
 maineffect_models: (default FALSE) main-effect models or exhaustive models. 
-screening : (default NA) specifies how many variables to screen down.
-K : (default NA) cutoff paramter used in variable ranking.        
+screening : (default None) specifies how many variables to screen down.
+K : (default None) cutoff paramter used in variable ranking.        
 
 Returns
 -------

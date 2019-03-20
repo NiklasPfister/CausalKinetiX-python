@@ -11,7 +11,7 @@ target : integer specifing which variable is the target.
 models : list of models. Each model is specified by a list of lists specifiying the variables included in the interactions of each term. for example, [[0],[1,2]] stands for a model whose predictor variables are x0 and x1*x2
 pen_degree : (default 2) specifies the penalization degree in the smoothing spline.
 num.folds : (default 2) number of folds used in cross-validation of smoothing spline. 
-include_vars : (default NA) specifies variables that should be included in each model.
+include_vars : (default None) specifies variables that should be included in each model. use -1 for using original variables(e.g. include_var=-1 returns same result as inculude_var=None). 
 include_intercept : (default FALSE) specifies whether to include a intercept in models.
 pooling : (default FALSE) specifies whether to pool repetitions in each environment.
 smoothing : (default FALSE) specifies whether to smooth data observations before fitting.
@@ -20,7 +20,7 @@ regression_class : (default OLS) other options are signed.OLS, optim, random.for
 sample_splitting : (default "loo") either leave-one-out (loo) or no splitting (none).
 score_type : (default "mean") : specifies the type of score funtion to use.
 integrated_model : (default TRUE) specifies whether to fit the integrated or the derived model.
-splitting_env : (default NA) an additonal environment 1d-array used for scoring.
+splitting_env : (default None) an additonal environment 1d-array used for scoring.
 weight_vec : (default rep(1, length(env)) a weight 1d-array used in the scoring. 
 set_initial : (default FALSE) specifies whether to fix the initial value.
 silent : (default TRUE) turn of additional output.
@@ -407,7 +407,6 @@ def CausalKinetiX_modelranking(
                         Xlist2[i] = np.concatenate([Xlist2[i], np.ones([L-1,1])], axis=1)
             data_list2[model] = Xlist2
 
-
     ######################################
     #
     # Step 4: Compute score
@@ -630,8 +629,9 @@ def CausalKinetiX_modelranking(
                 X2 = X                            
                 X = np.concatenate(Xlist2)
                 loo_ind2 = loo_ind
-                loo_ind = np.array(list(splitting_env)*(L-1))                               
+                loo_ind = np.array(list(splitting_env)*(L-1))  
             count = 0
+
             ### PLOT
             if show_plot==True:
                 minyplot = np.zeros([len(RSS_A)])
