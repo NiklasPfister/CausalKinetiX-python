@@ -74,9 +74,11 @@ def construct_models(D, L, d, n, target, times,
                              max_preds, expsize, env=None):
 
     ## Main-Effect and Full-Effect models depends on maineffects_models
-    if not maineffects_models==True:
+    # R implementation seems to be wrong
+    # if not maineffects_models==True:
+    if maineffects_models==True:
     # construct variable vector
-        if not include_vars==None:
+        if not isinstance(include_vars,type(None)):
             include_vars = np.array(include_vars)
             # for utility
             unmatch = lambda pattern, matched: \
@@ -88,7 +90,6 @@ def construct_models(D, L, d, n, target, times,
                 include_vars[include_vars>=0],
                 np.arange(d)
             )
-            print()
         else:
             vv = np.arange(d)
 
@@ -117,7 +118,7 @@ def construct_models(D, L, d, n, target, times,
             if products==True:
                 keep_terms += [[i,i] for i in vv]
             # include_vars
-            if not include_vars==None:
+            if not isinstance(include_vars,type(None)):
                 keep_terms_new = []
                 for i in range(len(keep_terms)):
                     for var in include_vars:
@@ -127,7 +128,7 @@ def construct_models(D, L, d, n, target, times,
                             tmp_term = [var] + keep_terms[i]
                             tmp_term.sort()
                             keep_terms_new.append(tmp_term)
-                keep_terms = keep_terms_new + [[term] for term in include_vars]
+                keep_terms = keep_terms_new + [[term] for term in include_vars[~include_vars<0]]
             num_terms = len(keep_terms)
 
         ## Construct models
@@ -138,7 +139,7 @@ def construct_models(D, L, d, n, target, times,
         else:
             models = [list(tupl) for tupl in combinations(keep_terms, expsize+1)]
     else:
-        if not include_vars==None:
+        if not isinstance(include_vars,type(None)):
             print("include_vars is not defined for maineffects_models==FALSE")
         ## Construct models
         if max_preds==True:
@@ -176,8 +177,7 @@ def extend_Dmat(D, L, d, n,
     ### include_vars is supported in different way from R implementation now
     ### include_var[i] < 0 indicates the original variable (not include_var[i] == 0)
     assert(type(L)==type(d)==type(n)==int)
-
-    if not include_vars==None:# different from implementation in R
+    if not isinstance(include_vars,type(None)):# different from implementation in R
         # construct variable vector
         include_vars = np.array(include_vars)
         # for utility
@@ -225,24 +225,24 @@ def extend_Dmat(D, L, d, n,
             count = count + 1
 
     # include variables to every term
-    if not include_vars==None:
-        Dfinal = np.zeros([Dnew.shape[0], len(include_vars)*Dnew.shape[1]+sum(include_vars!=0)*L])
-        ordering_final = np.zeros([len(include_vars)*len(ordering)+sum(include_vars!=0)], dtype=np.object)
+    if not isinstance(include_vars,type(None)):
+        Dfinal = np.zeros([Dnew.shape[0], len(include_vars)*Dnew.shape[1]+sum(~include_vars<0)*L])
+        ordering_final = np.zeros([len(include_vars)*len(ordering)+sum(~include_vars<0)], dtype=np.object)
         count = 0
-        for var in include_vars:
-            Dfinal[: ,range(count*L,(count+1)*L)] = D[: ,range(var*L,(var+1)*L)]
-            ordering_final[count] = var
+        for var in include_vars[~include_vars<0]:
+            Dfinal[: ,count*L:(count+1)*L] = D[: ,var*L:(var+1)*L]
+            ordering_final[count] = [var]
             count = count + 1
         for j in range(len(ordering)):
             for var in include_vars:
                 if var < 0:
                     ordering_final[count] = ordering[j]
-                    Dfinal[:,range(count*L,(count+1)*L)] = Dnew[:,range(j*L,(j+1)*L)]
+                    Dfinal[:,count*L:(count+1)*L] = Dnew[:,j*L:(j+1)*L]
                 else:
                     tmp_order = np.append(ordering[j], var)
                     tmp_order.sort()
                     ordering_final[count] = list(tmp_order)
-                    Dfinal[:,range(count*L,(count+1)*L)] = D[:,range(var*L,(var+1)*L)] * Dnew[:,range(j*L,(j+1)*L)]
+                    Dfinal[:,count*L:(count+1)*L] = D[:,var*L:(var+1)*L] * Dnew[:,j*L:(j+1)*L]
                 count = count + 1
         ordering = ordering_final
         Dnew = Dfinal
