@@ -37,7 +37,6 @@ Examples
 
 Notes
 -----
-The function CausalKinetiX_modelranking can be used if the variable ranking is not required.
 For further details see the following references.
 Pfister, N., S. Bauer, J. Peters (2018).
 Identifying Causal Structure in Large-Scale Kinetic Systems

@@ -45,7 +45,6 @@ Examples
                                    
 Notes
 -----
-The function CausalKinetiX_modelranking can be used if the variable ranking is not required.
 For further details see the following references.
 Pfister, N., S. Bauer, J. Peters (2018).
 Identifying Causal Structure in Large-Scale Kinetic Systems
@@ -60,9 +59,10 @@ import numbers
 from quadprog import solve_qp
 from scipy.optimize import minimize 
 
+
 def constrained_smoothspline(y,
                              times,
-                             pen_degree,
+                             pen_degree=2,
                              constraint="fixed",
                              derivative_values=None,
                              initial_value=None,
@@ -102,7 +102,7 @@ def constrained_smoothspline(y,
     if num_folds=="leave-one-out":
         folds = {}
         for i in range(len(times)):
-            folds[i] = i
+            folds[i] = [i]
         num_folds = len(folds)
     elif(isinstance(num_folds, int)):
         if(num_folds>1):
@@ -144,6 +144,7 @@ def constrained_smoothspline(y,
         Dmat_1 = {}
         Bmat_val = {}
         validation = {}
+        
         # compute the basis variables for each fold
         for i in range(num_folds):
             train = np.delete(np.arange(len(times)), folds[i])
@@ -213,11 +214,15 @@ def constrained_smoothspline(y,
 
     #needs to be deleted. only for debug
     if plot==True:
-        x = np.exp(np.linspace(np.log(0.1),np.log(10),100))
-        print([cost_function(xx) for xx in x])
+        print("plot=True is just for debugging of optimization of optimization of penalty parameter.")
+        x = np.linspace(0,4,100)
+        #print([cost_function(xx) for xx in x])
         from matplotlib import pyplot as plt
-        plt.plot(x, [cost_function(xx) for xx in x])
+        plt.plot(r*256**(3*x-1), [cost_function(xx) for xx in x])
         plt.xscale('log')
+        plt.yscale('log')
+        plt.xlabel('lambda')
+        plt.ylabel('cost')
 
     
     ##############################
@@ -306,10 +311,29 @@ def constrained_smoothspline(y,
     # smoothed derivative values
     smooth_deriv = Bmat_deriv @ csol
     # residuals
-    residuals = (y-smoothed_spline_values)
+    residuals = (y-smoothed_spline_values) 
+   
+
+    ################################
+    #
+    # Only for Python implementation
+    #
+    ################################
     
+    class trained_fit:
+        def __init__(self, basis, csol):
+            self.basis = basis
+            self.csol = csol
+
+        def predict(self,times_new):
+            Bmat_new = get_basis_matrix(times_new, self.basis)
+            return Bmat_new @ self.csol
+
     return {"smooth_vals":smoothed_spline_values,
             "residuals":residuals,
             "smooth_vals_new":predict_values,
             "smooth_deriv":smooth_deriv,
-            "pen_par":lambd}
+            "pen_par":lambd,
+            # Only for Python implementation
+            "trained_fit":trained_fit(basis, csol)
+           }

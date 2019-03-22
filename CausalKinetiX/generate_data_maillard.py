@@ -9,7 +9,7 @@ env : integer 1d-array of length n encoding to which experiment each repetition 
 L : number of time points for evaluation.
 intervention : type of intervention.
 intervention_par : parameters used in the interventions.
-ode.solver : specifies which ODE solver to use when solving ODE.
+ode_solver : specifies which ODE solver to use when solving ODE.
 seed : random seed.
 silent : set to FALSE if status output should be produced.
 
@@ -40,7 +40,6 @@ Examples
 
 Notes
 -----
-The function CausalKinetiX_modelranking can be used if the variable ranking is not required.
 For further details see the following references.
 Pfister, N., S. Bauer, J. Peters (2018).
 Identifying Causal Structure in Large-Scale Kinetic Systems
@@ -222,11 +221,11 @@ def generate_data_maillard(target,
             tmp = simulated_model[i][time_index,:]
 
             if relativ==True:
-                noise_var = tmp[:,target_ind].max() - tmp[:,target_ind].min() + 0.0000001 # diff of vector,matrix?
+                noise_var = noise*(tmp[:,target_ind].max() - tmp[:,target_ind].min()) + 0.0000001 # diff of vector,matrix?
                 noiseterm = np.random.randn(L*env_size) * noise_var
                 noiseterm = noiseterm.reshape([env_size, L])
             else:
-                noiseterm = np.random.randn(L*env_size) * noise_target
+                noiseterm = np.random.randn(L*env_size) * noise
                 noiseterm = noiseterm.reshape([env_size, L])
 
             simulated_data[env==i, :] = np.array([list(tmp.T.flatten())]*env_size)
@@ -236,12 +235,12 @@ def generate_data_maillard(target,
         else:
             tmp = simulated_model[i][time_index,:]
             if relativ==True:
-                noise_var = tmp.max(axis=0) - tmp.min(axis=0) + 0.0000001 # diff of vector,matrix?
+                noise_var = noise*(tmp.max(axis=0) - tmp.min(axis=0)) + 0.0000001 # diff of vector,matrix?
                 noiseterm = np.random.randn(L*d*env_size) * noise_var
                 noiseterm = noiseterm.reshape([env_size, L*d])
 
             else:
-                noiseterm = np.random.randn(L*d*env_size) * np.array(list(noise_var)*L*env_size)
+                noiseterm = np.random.randn(L*d*env_size) * noise
                 noiseterm = noiseterm.reshape([env_size, L*d])
 
             simulated_data[env==i,:] =  np.array([list(tmp)]*env_size) + noiseterm

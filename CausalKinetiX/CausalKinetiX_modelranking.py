@@ -8,7 +8,7 @@ D : data matrix(2d-array). Should have dimension n x (L*d), where n is the numbe
 times : 1d-array of length L specifying the time points at which data was observed.
 env : integer 1d-array of length n encoding to which experiment each repetition belongs.
 target : integer specifing which variable is the target.
-models : list of models. Each model is specified by a list of lists specifiying the variables included in the interactions of each term. for example, [[0],[1,2]] stands for a model whose predictor variables are x0 and x1*x2
+models : list of models. Each model is specified by a list of lists specifiying the variables included in the interactions of each term. for example, [[0],[1,2]] stands for a model whose predictor variables are x0 and x1*x2.
 pen_degree : (default 2) specifies the penalization degree in the smoothing spline.
 num.folds : (default 2) number of folds used in cross-validation of smoothing spline. 
 include_vars : (default None) specifies variables that should be included in each model. use -1 for using original variables(e.g. include_var=-1 returns same result as inculude_var=None). 
