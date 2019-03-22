@@ -98,13 +98,13 @@ def CausalKinetiX_modelranking(
     ):
     
     ## Set default parameter
-    if weight_vec==None:
+    if isinstance(weight_vec,type(None)):
         weight_vec = np.ones([len(env)])
     if splitting_env is None:
         splitting_env = deepcopy(env)
 
     ## Parameter consistency checks
-    if(smooth_Y==True and (not splitting_env==None)):
+    if(smooth_Y==True and (not isinstance(splitting_env,type(None)))):
         raise(Exception("If smooth.Y is TRUE, splitting.env needs to be NA."))
     assert(sum(type(model)==list for model in models))
     assert(type(env)==np.ndarray)
@@ -312,10 +312,10 @@ def CausalKinetiX_modelranking(
 
             dYlist[i] = fit["smooth_deriv"]
             
-             # compute differences for intergrated model fit
+            # compute differences for intergrated model fit
             if integrated_model==True:
                 dYlist[i] = Ylist[i][1:] - Ylist[i][:-1]
-
+                
             # fit the reference model and compute penalty par and RSS
             if(pen_degree[0] != pen_degree[1]):
                 fit = constrained_smoothspline(Ylist[i][~na_ind],
@@ -374,6 +374,7 @@ def CausalKinetiX_modelranking(
                     np.array([[]]+list(matched))[1:].reshape([1,-1])
                 ).sum(axis=0)>0]
             model_index = match(modelstot[model], ordering)
+            
     ##}
 
     ## collect predictors X

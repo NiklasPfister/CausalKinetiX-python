@@ -103,7 +103,7 @@ def CausalKinetiX(D,
     d = D.shape[1]//L  
 
     # Check whether a list of models was specified else generate models
-    if models==None:
+    if isinstance(models,type(None)):
         constructed_mods = construct_models(D, L, d, n, target, times,
                                          maineffect_models,
                                          screening,
@@ -114,11 +114,11 @@ def CausalKinetiX(D,
                                          expsize,
                                          env)
         models = constructed_mods["models"]
-        if K==None:
+        if isinstance(K,type(None)):
             K = constructed_mods["num_terms"]-expsize
 
     # check whether parameter K was specified
-    if K==None:
+    if isinstance(K,type(None)):
         print("K was not specified and the default does not make sense for arbitrary lists of models. It was set to 1, but this can invalidate the variable ranking.")
         K = 1
 

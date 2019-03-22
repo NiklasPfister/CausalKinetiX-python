@@ -68,7 +68,7 @@ def generate_data_hidden(env=np.zeros(10),
     # set seed
     if(type(seed)==numbers.Number):
         np.random.seed(seed)
-    if intervention_par==None:
+    if isinstance(intervention_par,type(None)):
         print("please_spcify intervention_par")
 
     ######################################
