@@ -402,8 +402,8 @@ def CausalKinetiX_modelranking(
             else:
                 for i in range(n):
                     Xlist2[i] = Dlist[i][:, model_index]
-                    tmp = (Xlist2[i][range(0,L-1),:] + Xlist2[i][range(1,L),:]) / 2
-                    Xlist2[i] = tmp * np.array(list(np.diff(times))*tmp.shape[1]).reshape(L-1, tmp.shape[1])
+                    tmp = (Xlist2[i][0:(L-1),:] + Xlist2[i][1:L,:]) / 2
+                    Xlist2[i] = tmp * np.diff(times).reshape(L-1, 1)
                     if include_intercept==True:
                         Xlist2[i] = np.concatenate([Xlist2[i], np.ones([L-1,1])], axis=1)
             data_list2[model] = Xlist2
@@ -544,7 +544,7 @@ def CausalKinetiX_modelranking(
                     env_ind = (loo_ind2==unique_env[i])
                     fitted_dY_tmp = fitted_dY[env_ind].reshape([L,-1]).mean(axis=1)
 
-                    fit = constrained_smoothspline(Ylist[[i]],
+                    fit = constrained_smoothspline(Ylist[i],
                                               np.array(list(times)*num_reps),
                                               pen_degree[1],
                                               constraint="fixed",
@@ -743,10 +743,10 @@ def CausalKinetiX_modelranking(
                     len_env = sum(splitting_env==unique_env[i])
                     fitted_dY_tmp = fitted_dY.reshape([L,-1]).mean(axis=1)
                     fit = constrained_smoothspline(Ylist[i],
-                                                  np.array(list(times)*len_env),
+                                                  times,
                                                   pen_degree[1],
                                                   constraint="fixed",
-                                                  derivative_values=np.array(list(fitted_dY_tmp)*len_env),
+                                                  derivative_values=fitted_dY_tmp,
                                                   initial_value=initial_values[i],
                                                   times_new=times_new,
                                                   num_folds=num_folds,
