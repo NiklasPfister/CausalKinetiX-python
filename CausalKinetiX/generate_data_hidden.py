@@ -56,19 +56,19 @@ import numbers
 
 def generate_data_hidden(env=np.zeros(10),
                          L=15,
-                         noise=0.01,
+                         noise_sd=0.01,
                          only_target_noise=True,
                          relativ=False,
-                         intervention="initial_blockreactions5",
+                         intervention="initial_blockreactions",
+                         intervention_par=0.1,
                          hidden=True,
-                         intervention_par=None,
                          ode_solver="LSODA",
                          seed=None,
                          silent=False):
     # set seed
-    if(type(seed)==numbers.Number):
+    if(type(seed) == numbers.Number):
         np.random.seed(seed)
-    if isinstance(intervention_par,type(None)):
+    if isinstance(intervention_par, type(None)):
         print("please_spcify intervention_par")
 
     ######################################
@@ -76,7 +76,6 @@ def generate_data_hidden(env=np.zeros(10),
     # Simulate data
     #
     ######################################
-
 
     ###
     # Initialize RHS
@@ -94,7 +93,7 @@ def generate_data_hidden(env=np.zeros(10),
         dx8 = theta[1]*x[6] - theta[3]*x[7]
         dx9 = theta[3]*x[7] + theta[4]*x[2]
 
-        return(np.array([dx1,dx2,dx3,dx4,dx5,dx6,dx7,dx8,dx9]))
+        return(np.array([dx1, dx2, dx3, dx4, dx5, dx6, dx7, dx8, dx9]))
 
     ###
     # Set parameters
@@ -117,120 +116,54 @@ def generate_data_hidden(env=np.zeros(10),
     theta_obs = np.array([0.8, 0.8, 0.1, 1, 0.03, 0.6, 1, 0.2, 0.5])*0.1
     n_env = len(set(env))
 
-    fixed_reactions = np.array([4, 5, 7])
-
     true_set = [[2]]
 
     # for utility
     match = lambda pattern, matched: np.equal(
-            np.array(pattern).reshape([-1,1]), 
-            np.array(matched).reshape([1,-1])
-        ).sum(axis=0)>0
-    
-    
+        np.array(pattern).reshape([-1, 1]),
+        np.array(matched).reshape([1, -1])).sum(axis=0) > 0
+
     ###
     # Define interventions
     ###
 
-    if intervention == "only_initial":
+    if intervention == "initial":
         def intervention_fun():
-            initial_int = np.zeros(7)
-            initial_int[0] = np.random.rand(1)*10
-            initial_int[3] = np.random.rand(1)*10
-            return({"initial":initial_int,
-                    "theta":theta_obs})
-
-    elif intervention == "only_blockreactions":
-        def intervention_fun():
-            r_vec = ~match(fixed_reactions, np.arange(len(theta_obs)))
-            num_reactions = int(sum(r_vec))
-            theta_int = theta_obs
-            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(1,1-1/num_reactions, size=num_reactions)
-            return({"initial":initial_obs,
-                    "theta":theta_int})
-
-    elif intervention == "initial_blockreactions1":
-        true_set = [[1],[2]]
-        def intervention_fun():
-            r_vec = ~match(fixed_reactions, np.arange(len(theta_obs)))
-            num_reactions = int(sum(r_vec))
-            theta_int = theta_obs
-            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(1,1-2/num_reactions, size=num_reactions)
-            initial_int = np.zeros(8)
+            initial_int = np.zeros(9)
             initial_int[0] = np.random.rand(1)*10
             initial_int[3] = np.random.rand(1)*10
             initial_int[4] = np.random.rand(1)*10
-            return({"initial":initial_int,
-                    "theta":theta_int})
+            return({"initial": initial_int,
+                    "theta": theta_obs})
 
-    elif intervention == "initial_blockreactions2":
+    elif intervention == "blockreactions":
         true_set = [[2]]
-        theta_obs[6] = np.random.rand(1)
-        fixed_reactions = [3, 4]
-        def intervention_fun():
-            r_vec = ~match(fixed_reactions, np.arange(len(theta_obs)))
-            num_reactions = int(sum(r_vec))
-            theta_int = theta_obs
-            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(1,1-2/num_reactions, size=num_reactions)
-            initial_int = np.zeros(8)
-            initial_int[0] = np.random.rand(1)*10
-            initial_int[3] = np.random.rand(1)*10
-            initial_int[4] = np.random.rand(1)*10
-            return({"initial":initial_int,
-                    "theta":theta_int})
-
-    elif intervention == "initial_blockreactions3":
-        true_set = [[2]]
-        const = intervention_par
-        theta_obs[6] = theta_obs[3]+(np.random.rand(1)-1/2)*2*const
-        fixed_reactions = np.array([3, 4])
-        def intervention_fun():
-            r_vec = ~match(fixed_reactions, np.arange(len(theta_obs)))
-            num_reactions = int(sum(r_vec))
-            theta_int = theta_obs
-            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(1,1-2/num_reactions, size=num_reactions)
-            if r_vec[6]==True:
-                theta_int[6] = theta_obs[3]+(np.random.rand(1)-1/2)*2*const
-            initial_int = np.zeros(8)
-            initial_int[0] = np.random.rand(1)*10
-            initial_int[3] = np.random.rand(1)*10
-            initial_int[4] = np.random.rand(1)*10
-            return({"initial":initial_int,
-                    "theta":theta_int})
-
-    elif intervention == "initial_blockreactions4":
-        true_set = [[2]]
-        theta_obs[6] = intervention_par
         fixed_reactions = [3, 4, 6]
         def intervention_fun():
             r_vec = ~match(fixed_reactions, np.arange(len(theta_obs)))
             num_reactions = int(sum(r_vec))
             theta_int = theta_obs
-            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(1,1-2/num_reactions, size=num_reactions)
-            initial_int = np.zeros(9)
-            initial_int[0] = np.random.rand(1)*10
-            initial_int[3] = np.random.rand(1)*10
-            initial_int[4] = np.random.rand(1)*10
-            return({"initial":initial_int,
-                    "theta":theta_int})
+            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(
+                1, 1-1/num_reactions, size=num_reactions)
+            return({"initial": initial_obs,
+                    "theta": theta_int})
 
-    elif intervention == "initial_blockreactions5":
+    elif intervention == "initial_blockreactions":
         true_set = [[2]]
         fixed_reactions = [4, 5, 7]
         def intervention_fun():
             r_vec = ~match(fixed_reactions, np.arange(len(theta_obs)))
             num_reactions = int(sum(r_vec))
             theta_int = theta_obs
-            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(1,1-1/num_reactions, size=num_reactions)
-            theta_int[6] = max(theta_obs[7] + (np.random.rand(1)-1/2)*2*intervention_par,0)
-            #theta_int[10] = runif(1, 0, intervention_par)
+            theta_int[r_vec] = theta_int[r_vec]*np.random.binomial(
+                1, 1-1/num_reactions, size=num_reactions)
+            theta_int[6] = max(theta_obs[6] + (np.random.rand(1)-1/2)*2*intervention_par, 0)
             initial_int = np.zeros(9)
             initial_int[0] = np.random.rand(1)*10
             initial_int[3] = np.random.rand(1)*10
             initial_int[4] = np.random.rand(1)*10
-            #initial_int[2] = runif(1, 0, intervention_par)
-            return({"initial":initial_int,
-                    "theta":theta_int})
+            return({"initial": initial_int,
+                    "theta": theta_int})
 
     ###
     # Generate data from exact ODE and generate observations
@@ -254,44 +187,43 @@ def generate_data_hidden(env=np.zeros(10),
             theta = int_data["theta"]
 
         # solve ODE numerically
-        if not silent==True:
+        if not silent:
             print("Currently solving ODE-system on environment {}".format(i))
 
         # catch warnings from ODE solver --> not a good model
-        simulated_model[i] = scipy.integrate.solve_ivp(y0 = initial, 
-                                                       fun = lambda t,x:reactions(t,x,theta), 
-                                                       t_span=[0,100], 
-                                                       t_eval=time_grid, 
-                                                       method=ode_solver
-                                                      ).y.T
-        if type(simulated_model[i])==float or simulated_model[i].shape[0]<len(time_grid):
-            if not silent==True:
+        simulated_model[i] = scipy.integrate.solve_ivp(y0=initial,
+                                                       fun=lambda t, x:reactions(t, x, theta),
+                                                       t_span=[0, 100],
+                                                       t_eval=time_grid,
+                                                       method=ode_solver).y.T
+        if type(simulated_model[i]) == float or simulated_model[i].shape[0] < len(time_grid):
+            if not silent:
                 print("Problem in ode-solver")
                 return(None)
 
         # select time points and add noise
-        if only_target_noise==True:
+        if only_target_noise:
             tmp = simulated_model[i][time_index, :]
-            if relativ==True:
-                noise_var = noise*(tmp[:, target].max() - tmp[:, target].min()) + 0.0000001
+            if relativ:
+                noise_var = noise_sd*(tmp[:, target].max() - tmp[:, target].min()) + 0.0000001
                 noiseterm = (np.random.randn(L*env_size)*noise_var).reshape([env_size, L])
             else:
-                noiseterm = (np.random.randn(L*env_size)*noise).reshape([env_size, L])
-            simulated_data[env==i, :] =  np.array([list(tmp.T.flatten())]*env_size)
-            simulated_data[env==i, target*L:(target+1)*L]\
-                = simulated_data[env==i, target*L:(target+1)*L] + noiseterm
+                noiseterm = (np.random.randn(L*env_size)*noise_sd).reshape([env_size, L])
+            simulated_data[env == i, :] = np.array([list(tmp.T.flatten())]*env_size)
+            simulated_data[env == i, target*L:(target+1)*L]\
+                = simulated_data[env == i, target*L:(target+1)*L] + noiseterm
 
         else:
             tmp = simulated_model[i][time_index, :]
-            if relativ==True:
-                noise_var = noise*(tmp.max(axis=0) - tmp.min(axis=0)) + 0.0000001 # diff of vector,matrix?
-                noiseterm = np.random.randn(L*d*env_size) 
-                noiseterm = noiseterm.reshape([env_size, L*d]) * np.repeat(noise_var, L).reshape([1,-1])
+            if relativ:
+                noise_var = noise_sd*(tmp.max(axis=0) - tmp.min(axis=0)) + 0.0000001
+                noiseterm = np.random.randn(L*d*env_size)
+                noiseterm = noiseterm.reshape([env_size, L*d]) * np.repeat(noise_var, L).reshape([1, -1])
             else:
                 noiseterm = np.random.randn(L*d*env_size) * np.array(list(noise_var)*L*env_size)
                 noiseterm = noiseterm.reshape([env_size, L*d])
 
-            simulated_data[env==i,:] =  np.array([list(tmp.T.flatten())]*env_size) + noiseterm
+            simulated_data[env == i, :] = np.array([list(tmp.T.flatten())]*env_size) + noiseterm
 
     ###
     # Check if a blow-up occured
@@ -300,10 +232,10 @@ def generate_data_hidden(env=np.zeros(10),
     blowup = np.zeros([n_env], dtype=np.bool)
     for i in range(n_env):
         blowup[i] = np.abs(simulated_model[i][len(time_grid)-1,-1]) > 1e+8 or\
-                    np.isnan(np.abs(simulated_model[i][len(time_grid)-1,-1]))
+            np.isnan(np.abs(simulated_model[i][len(time_grid)-1,-1]))
 
-    if sum(blowup)>0:
-        if not silent==True:
+    if sum(blowup) > 0:
+        if not silent:
             print("Detected blow-up")
         ## Call function again (no seed!)
         return(blowup)
@@ -312,19 +244,19 @@ def generate_data_hidden(env=np.zeros(10),
     # Remove hidden variables
     ###
 
-    if hidden==True:
+    if hidden:
         hidden_index = np.zeros(9*L, dtype=np.bool)
         hidden_index[5*L:7*L] = True
-        simulated_data = simulated_data[:,~hidden_index]
+        simulated_data = simulated_data[:, ~hidden_index]
         target = 6
     else:
         target = 8
-        
+
     return({
-        "simulated_data":simulated_data,
-        "time":time,
-        "env":env,
-        "simulated_model":simulated_model,
-        "true_model":true_set,
-        "target":target,
+        "simulated_data": simulated_data,
+        "time": time,
+        "env": env,
+        "simulated_model": simulated_model,
+        "true_model": true_set,
+        "target": target,
     })

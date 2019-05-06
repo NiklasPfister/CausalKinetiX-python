@@ -10,18 +10,18 @@ env : integer 1d-array of length n encoding to which experiment each repetition 
 target : integer specifing which variable is the target.
 models : list of models. Each model is specified by a list of lists specifiying the variables included in the interactions of each term. for example, [[0],[1,2]] stands for a model whose predictor variables are x0 and x1*x2.
 pen_degree : (default 2) specifies the penalization degree in the smoothing spline.
-num.folds : (default 2) number of folds used in cross-validation of smoothing spline. 
-include_vars : (default None) specifies variables that should be included in each model. use -1 for using original variables(e.g. include_var=-1 returns same result as inculude_var=None). 
+num.folds : (default 2) number of folds used in cross-validation of smoothing spline.
+include_vars : (default None) specifies variables that should be included in each model. use -1 for using original variables(e.g. include_var=-1 returns same result as inculude_var=None).
 include_intercept : (default FALSE) specifies whether to include a intercept in models.
 pooling : (default FALSE) specifies whether to pool repetitions in each environment.
 smoothing : (default FALSE) specifies whether to smooth data observations before fitting.
-smooth_Y : (default FALSE) specifies whether to smooth target observations before fitting. 
+smooth_Y : (default FALSE) specifies whether to smooth target observations before fitting.
 regression_class : (default OLS) other options are signed.OLS, optim, random.forest.
 sample_splitting : (default "loo") either leave-one-out (loo) or no splitting (none).
 score_type : (default "mean") : specifies the type of score funtion to use.
 integrated_model : (default TRUE) specifies whether to fit the integrated or the derived model.
 splitting_env : (default None) an additonal environment 1d-array used for scoring.
-weight_vec : (default rep(1, length(env)) a weight 1d-array used in the scoring. 
+weight_vec : (default rep(1, length(env)) a weight 1d-array used in the scoring.
 set_initial : (default FALSE) specifies whether to fix the initial value.
 silent : (default TRUE) turn of additional output.
 show_plot (default FALSE) show diagnostic plots.
@@ -47,14 +47,14 @@ Examples
 >>> plt.plot(time, D[0,-len(time):], 'o',c="red")
 >>> plt.legend(["observations"])
 >>> # output of following is random
->>> CausalKinetiX_modelranking(D, time, env, target, models, 
-                           include_vars=None, show_plot=True, 
+>>> CausalKinetiX_modelranking(D, time, env, target, models,
+                           include_vars=None, show_plot=True,
                            integrated_model=False, score_type="mean2")
 array([0.00598046])
 
 Notes
 -----
-The function CausalKinetiX is a wrapper for this function that also computes the variable ranking. 
+The function CausalKinetiX is a wrapper for this function that also computes the variable ranking.
 For further details see the following references.
 Pfister, N., S. Bauer, J. Peters (2018).
 Identifying Causal Structure in Large-Scale Kinetic Systems
@@ -73,43 +73,41 @@ from copy import deepcopy
 from .constrained_smoothspline import constrained_smoothspline
 from .utils import extend_Dmat
 
-def CausalKinetiX_modelranking(
-        D, 
-        times, 
-        env, 
-        target, 
-        models, 
-        pen_degree = 2,
-        num_folds = 2,
-        include_vars = None,
-        include_intercept = False,
-        pooling = False,
-        smoothing = False,
-        smooth_Y = False,
-        regression_class = "OLS",
-        sample_splitting = "loo",
-        score_type = "mean",
-        integrated_model = True,
-        splitting_env = None,
-        weight_vec = None,
-        set_initial = False,
-        silent = True,
-        show_plot = False
-    ):
-    
+def CausalKinetiX_modelranking(D,
+                               times,
+                               env,
+                               target,
+                               models,
+                               pen_degree=2,
+                               num_folds=2,
+                               include_vars=None,
+                               include_intercept=False,
+                               pooling=False,
+                               smoothing=False,
+                               smooth_Y=False,
+                               regression_class="OLS",
+                               sample_splitting="loo",
+                               score_type="mean",
+                               integrated_model=True,
+                               splitting_env=None,
+                               weight_vec=None,
+                               set_initial=False,
+                               silent=True,
+                               show_plot=False):
+
     ## Set default parameter
-    if isinstance(weight_vec,type(None)):
+    if isinstance(weight_vec, type(None)):
         weight_vec = np.ones([len(env)])
     if splitting_env is None:
         splitting_env = deepcopy(env)
 
     ## Parameter consistency checks
-    if(smooth_Y==True and (not isinstance(splitting_env,type(None)))):
+    if(smooth_Y and (not isinstance(splitting_env, type(None)))):
         raise(Exception("If smooth.Y is TRUE, splitting.env needs to be NA."))
-    assert(sum(type(model)==list for model in models))
-    assert(type(env)==np.ndarray)
-    assert(len(set(times))==len(times))
-    
+    assert(sum(type(model) == list for model in models))
+    assert(type(env) == np.ndarray)
+    assert(len(set(times)) == len(times))
+
     ############################
     #
     # initialize
@@ -121,25 +119,24 @@ def CausalKinetiX_modelranking(
     L = len(times)
     d = D.shape[1]//L
 
-    if type(pen_degree)==int:
+    if type(pen_degree) == int:
         pen_degree = np.repeat(pen_degree, 2)
 
     # check whether to include products and interactions
-    products = any(len(term)>len(set(term)) for term in sum(models,[]))
-    interactions = any(len(set(term))>1 for term in sum(models,[]))
+    products = any(len(term) > len(set(term)) for term in sum(models, []))
+    interactions = any(len(set(term)) > 1 for term in sum(models, []))
 
     # sort environments to increasing order
     splitting_env.sort()
-    D = D[splitting_env,]
-    if smooth_Y==True:
+    D = D[splitting_env, ]
+    if smooth_Y:
         weight_vec = weight_vec[list(set(env))] #list(set(*)) is equivalent to order(unique(*))
     else:
         weight_vec = weight_vec[splitting_env]
 
-
     # construct DmatY
     target_ind = np.arange(target*L, (target+1)*L)
-    DmatY = D[:,target_ind]
+    DmatY = D[:, target_ind]
 
     # add interactions to D-matrix if interactions==TRUE
     if (interactions or products or (not include_vars is None)):
@@ -147,9 +144,9 @@ def CausalKinetiX_modelranking(
             interactions = True
             products = True
         include_obj = extend_Dmat(D, L, d, n,
-                                   products=products,
-                                   interactions=interactions,
-                                   include_vars=include_vars)
+                                  products=products,
+                                  interactions=interactions,
+                                  include_vars=include_vars)
         D = include_obj["Dnew"]
         ordering = include_obj["ordering"]
         dtot = D.shape[1]//L
@@ -158,34 +155,33 @@ def CausalKinetiX_modelranking(
         dtot = d
         ordering = np.array([[i] for i in range(d)], dtype=np.object)
 
-
-    ######################################
+    ##################################################
     #
-    # Step 1: Smoothing & Pooling
+    # Step 1: Pooling & Smoothing
     #
-    #####################################
+    #################################################
 
     # initialize variables
-    Dlist = np.zeros([n],np.object)
+    Dlist = np.zeros([n], np.object)
     ## use pooling on environments
-    if pooling==True:
+    if pooling:
         ## with smoothing
         if smoothing:
             unique_env = list(set(env))
             for i in range(n):
-                Dlist[i] = D[i,:].reshape([dtot, L]).T
+                Dlist[i] = D[i, :].reshape([dtot, L]).T
 
             # perform smoothing
             count = 1
             for i in range(len(unique_env)):
-                times_vec = np.array(list(times)*sum(env==unique_env[i]))
-                Dlist_vec = np.concatenate(list(Dlist[env==unique_env[i]]), axis=0)
+                times_vec = np.array(list(times)*sum(env == unique_env[i]))
+                Dlist_vec = np.concatenate(list(Dlist[env == unique_env[i]]), axis=0)
                 for j in range(dtot):
-                    na_ind = np.isnan(Dlist_vec[:,j])
-                    f_approx = interp1d(times_vec[~na_ind], Dlist_vec[~na_ind,j], kind="cubic")
-                    for k in range(sum(env==unique_env[i])):
-                        Dlist[count+k][:,j] = f_approx(times)        
-                count = count + sum(env==unique_env[i])
+                    na_ind = np.isnan(Dlist_vec[:, j])
+                    f_approx = interp1d(times_vec[~na_ind], Dlist_vec[~na_ind, j], kind="cubic")
+                    for k in range(sum(env == unique_env[i])):
+                        Dlist[count+k][:, j] = f_approx(times)
+                count = count + sum(env == unique_env[i])
 
         ## without smoothing
         else:
