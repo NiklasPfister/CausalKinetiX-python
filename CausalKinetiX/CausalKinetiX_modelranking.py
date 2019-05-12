@@ -1,6 +1,8 @@
 """
 Applies CausalKinetiX framework to rank variables and models according to their stability.
 
+This function scores a specified list of models and does not include a variable ranking.
+
 Parameters
 ----------
 
@@ -13,8 +15,8 @@ pen_degree : (default 2) specifies the penalization degree in the smoothing spli
 num.folds : (default 2) number of folds used in cross-validation of smoothing spline.
 include_vars : (default None) specifies variables that should be included in each model. use -1 for using original variables(e.g. include_var=-1 returns same result as inculude_var=None).
 include_intercept : (default FALSE) specifies whether to include a intercept in models.
-pooling : (default FALSE) specifies whether to pool repetitions in each environment.
-smoothing : (default FALSE) specifies whether to smooth data observations before fitting.
+average_reps : (default False) specifies whether to average repetitions in each environment.
+smooth_X : (default False) specifies whether to smooth predictor observations before fitting.
 smooth_Y : (default FALSE) specifies whether to smooth target observations before fitting.
 regression_class : (default OLS) other options are signed.OLS, optim, random.forest.
 sample_splitting : (default "loo") either leave-one-out (loo) or no splitting (none).
@@ -82,8 +84,8 @@ def CausalKinetiX_modelranking(D,
                                num_folds=2,
                                include_vars=None,
                                include_intercept=False,
-                               pooling=False,
-                               smoothing=False,
+                               average_reps=False,
+                               smooth_X=False,
                                smooth_Y=False,
                                regression_class="OLS",
                                sample_splitting="loo",
@@ -157,59 +159,41 @@ def CausalKinetiX_modelranking(D,
 
     ##################################################
     #
-    # Step 1: Pooling & Smoothing
+    # Step 1: Average Repetitions & Smooth predictors
     #
     #################################################
 
-    # initialize variables
+    ## Averaging
+    
+    ## use averaging on environments
+    if average_reps:
+        unique_env = list(set(env))
+        D_new = np.zeros([len(unique_env),D.shape[1]])
+        DmatY_new = np.zeros([len(unique_env),L])
+        
+        for i in range(len(unique_env)):
+            D_new[i,:] = D[env == unique_env[i],:].mean(axis=1)
+            D_new[i,:] = D[env == unique_env[i],:].mean(axis=1)
+        
+        splitting_env = list(set(splitting_env))
+        env = unique_env
+        n = len(env)
+
+    ## Smoothing
     Dlist = np.zeros([n], np.object)
-    ## use pooling on environments
-    if pooling:
-        ## with smoothing
-        if smoothing:
-            unique_env = list(set(env))
-            for i in range(n):
-                Dlist[i] = D[i, :].reshape([dtot, L]).T
+    if smooth_X==True:
+        for i in range(n):
+            Dlist[i] = D[i,].reshape([dtot, L]).T
+            # smooth X-values
+            for j in range(dtot):
+                na_ind = np.isnan(Dlist[i][:,j])
+                f_approx = interp1d(times[~na_ind], Dlist[i][~na_ind,j], kind="cubic")
+                Dlist[i][:,j] = f_approx(times)
 
-            # perform smoothing
-            count = 1
-            for i in range(len(unique_env)):
-                times_vec = np.array(list(times)*sum(env == unique_env[i]))
-                Dlist_vec = np.concatenate(list(Dlist[env == unique_env[i]]), axis=0)
-                for j in range(dtot):
-                    na_ind = np.isnan(Dlist_vec[:, j])
-                    f_approx = interp1d(times_vec[~na_ind], Dlist_vec[~na_ind, j], kind="cubic")
-                    for k in range(sum(env == unique_env[i])):
-                        Dlist[count+k][:, j] = f_approx(times)
-                count = count + sum(env == unique_env[i])
-
-        ## without smoothing
-        else:
-            unique_env = list(set(env))
-            Dlist = np.zeros([n])
-            count = 1
-            for i in range(len(unique_env)):
-                tmpD = np.median(D[env==unique_env[i],:].reshape([sum(unique_env[i]==env), L, dtot]), axis=0)
-                for j in range(sum(unique_env[i]==env)):
-                    Dlist[count] = tmpD
-                    count = count+1
-
-    ## don't use pooling on environments
+    ## without smoothing
     else:
-    ## with smoothing
-        if smoothing==True:
-            for i in range(n):
-                Dlist[i] = D[i,].reshape([dtot, L]).T
-                # smooth X-values
-                for j in range(dtot):
-                    na_ind = np.isnan(Dlist[i][:,j])
-                    f_approx = interp1d(times[~na_ind], Dlist[i][~na_ind,j], kind="cubic")
-                    Dlist[i][:,j] = f_approx(times)
-
-        ## without smoothing
-        else:
-            for i in range(n):
-                Dlist[i] = D[i,:].reshape([dtot, L]).T
+        for i in range(n):
+            Dlist[i] = D[i,:].reshape([dtot, L]).T
 
     ######################################
     #
@@ -728,7 +712,6 @@ def CausalKinetiX_modelranking(D,
                         RSS_B[count] = sum(fit["residuals"]**2)
                         UpDown_B[count] = fit["smooth_vals"][len(fit["smooth_vals"])-1]
                         RSS3_B[count] = sum(fit["residuals"][[1, int(len(fit['residuals'])/2), len(fit['residuals'])-1]]**2)
-                    
                         ### PLOT
                         if show_plot==True:
                             idx = np.arange(len(splitting_env))[splitting_env==unique_env[i]][j]
@@ -737,7 +720,7 @@ def CausalKinetiX_modelranking(D,
                         
                 else:
                     len_env = sum(splitting_env==unique_env[i])
-                    fitted_dY_tmp = fitted_dY.reshape([L,-1]).mean(axis=1)
+                    fitted_dY_tmp = fitted_dY.reshape([L,-1]).mean(axis=1)                    
                     fit = constrained_smoothspline(Ylist[i],
                                                   times,
                                                   pen_degree[1],
@@ -797,6 +780,23 @@ def CausalKinetiX_modelranking(D,
                     plt.ylim([miny, maxy])
 
                     for k in range(sum(env_ind)):
+                        plt.plot(times_new, Ya[k], '-', c="red")
+                        plt.plot(times_new, Yb[k], '-', c="blue")
+                        plt.plot(times_new, constrained_fit[k], '-', c="green")
+                    #readline("Press enter")
+                    plt.show()
+                    
+                    
+                    for i in range(num.env):
+                        env_ind = splitting_env == unique_env[i]
+                        times1 = np.array(list(times)*sum(env_ind))
+                        L = len(times)
+                        # for utility
+                        min_ = lambda ary_obj:min([min(obj) for obj in ary_obj])
+                        max_ = lambda ary_obj:max([max(obj) for obj in ary_obj])
+                        miny = min(min_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
+                        maxy = max(max_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
+                        # plot
                         plt.plot(times_new, Ya[k], '-', c="red")
                         plt.plot(times_new, Yb[k], '-', c="blue")
                         plt.plot(times_new, constrained_fit[k], '-', c="green")
