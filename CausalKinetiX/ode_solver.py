@@ -128,7 +128,6 @@ def ode_solver(time_vec, initial_value, times, X, model,
                                        t_span=[time_vec.min(), time_vec.max()],
                                        t_eval=time_vec,
                                        rtol=reltol, atol=abstol)
-    print(result)
     odefit = np.concatenate([result.t.reshape([-1, 1]), result.y.T], axis=1)
 
     return odefit
