@@ -256,6 +256,29 @@ def constrained_smoothspline(y,
     #
     ##############################
 
+    class trained_fit:
+        
+        def __init__(self, basis, csol, times):
+            self.basis = basis
+            self.csol = csol
+            self.times_max = times.max()
+            self.times_min = times.min()
+            self.edge_val_min = get_basis_matrix(np.array([self.times_min]), basis) @ csol
+            self.edge_val_max = get_basis_matrix(np.array([self.times_max]), basis) @ csol
+    
+
+        def predict(self, times_new):
+            Bmat_new = get_basis_matrix(times_new, self.basis)
+            eps = 1e-8*(self.times_max - self.times_min)
+            delta_times_new_under = (times_new-self.times_min) * (times_new<self.times_min)
+            delta_times_new_over = (times_new-self.times_max) * (times_new>self.times_max)
+            derives_under = get_deriv_matrix(np.array([self.times_min+eps]), basis) @ csol
+            derives_over = get_deriv_matrix(np.array([self.times_max-eps]), basis) @ csol
+            return Bmat_new @ self.csol \
+                + delta_times_new_under * derives_under + (times_new<self.times_min) * self.edge_val_min\
+                + delta_times_new_over * derives_over + (times_new>self.times_max) * self.edge_val_max\
+
+    
     # set up quadratic program
     Bmat = get_basis_matrix(times, basis)
     Bmat_deriv = get_deriv_matrix(times, basis)
@@ -294,9 +317,10 @@ def constrained_smoothspline(y,
                             bvec,
                             meq)
     csol = solutions_qp[0]
+    fit = trained_fit(basis, csol, times)
+
     # smoothed values at times.new
-    Bmat_new = get_basis_matrix(times_new, basis)
-    predict_values = Bmat_new @ csol
+    predict_values = fit.predict(times_new)
     # smoothed values at times
     smoothed_spline_values = Bmat @ csol
     # smoothed derivative values
@@ -310,19 +334,10 @@ def constrained_smoothspline(y,
     #
     ################################
 
-    class trained_fit:
-        def __init__(self, basis, csol):
-            self.basis = basis
-            self.csol = csol
-
-        def predict(self, times_new):
-            Bmat_new = get_basis_matrix(times_new, self.basis)
-            return Bmat_new @ self.csol
-
     return {"smooth_vals": smoothed_spline_values,
             "residuals": residuals,
             "smooth_vals_new": predict_values,
             "smooth_deriv": smooth_deriv,
             "pen_par": lambd,
             # Only for Python implementation
-            "trained_fit": trained_fit(basis, csol)}
+            "trained_fit": fit}
