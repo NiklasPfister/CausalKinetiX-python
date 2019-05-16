@@ -52,11 +52,12 @@ import numpy as np
 import numbers
 import scipy.integrate
 
+
 def generate_data_maillard(target,
                            env=np.ones([10]),
                            L=15,
                            noise_sd=0.01,
-                           only_target_noise=True,
+                           only_target_noise=False,
                            relativ=False,
                            intervention="initial_blockreactions",
                            ode_solver="LSODA",
@@ -147,7 +148,7 @@ def generate_data_maillard(target,
             initial_int[:2] = np.random.rand(2)*360
             initial_int[9] = np.random.rand(1)*30
             return({"initial": initial_int,
-                    "theta"  : theta_obs})
+                    "theta" : theta_obs})
 
     elif intervention == "blockreactions":
         def intervention_fun():
@@ -218,7 +219,8 @@ def generate_data_maillard(target,
             tmp = simulated_model[i][time_index, :]
 
             if relativ:
-                noise_var = noise_sd*(tmp[:,target_ind].max() - tmp[:,target_ind].min()) + 0.0000001
+                noise_var = noise_sd*(tmp[:, target].max() -
+                                      tmp[:, target].min()) + 0.0000001
                 noiseterm = np.random.randn(L*env_size) * noise_var
                 noiseterm = noiseterm.reshape([env_size, L])
             else:
@@ -233,14 +235,15 @@ def generate_data_maillard(target,
             tmp = simulated_model[i][time_index, :]
             if relativ:
                 noise_var = noise_sd*(tmp.max(axis=0) - tmp.min(axis=0)) + 0.0000001
-                noiseterm = np.random.randn(L*d*env_size) * noise_var
+                noiseterm = np.random.randn(L*d*env_size) * np.tile(np.repeat(noise_var, L),
+                                                                    env_size)
                 noiseterm = noiseterm.reshape([env_size, L*d])
 
             else:
                 noiseterm = np.random.randn(L*d*env_size) * noise_sd
                 noiseterm = noiseterm.reshape([env_size, L*d])
 
-            simulated_data[env == i, :] = np.array([list(tmp)]*env_size) + noiseterm
+            simulated_data[env == i, :] = np.array([list(tmp.T.flatten())]*env_size) + noiseterm
 
     ###
     # Check if a blow-up occured

@@ -37,13 +37,13 @@ true_model = simulation_obj["true_model"]
 theta=np.array([0.01, 0.00509, 0.00047, 0.0011, 0.00712, 0.00439, 0.00018, 0.11134, 0.14359, 0.00015, 0.12514])
 coef=[theta[0], -(theta[1]+theta[3]+theta[4]), -theta[9]]
 
-# compute the target trajectory from ode model given other observations 
-odefit = ode_solver(time_vec=time, 
-                    initial_value=X_[0,[target]], 
-                    times=time, 
-                    X=X[:len(time),:], 
-                    model=true_model, 
-                    target=target, 
+# compute the target trajectory from ode model given other observations
+odefit = ode_solver(time_vec=time,
+                    initial_value=X_[0,[target]],
+                    times=time,
+                    X=X[:len(time),:],
+                    model=true_model,
+                    target=target,
                     coefs=coef)
 
 # plot the trajectory and observatons
@@ -58,37 +58,35 @@ Identifying Causal Structure in Large-Scale Kinetic Systems
 (https://arxiv.org/pdf/1810.11776.pdf)
 """
 
-
-
-
 import numpy as np
 import scipy.integrate
-from scipy.interpolate import interp1d
-import statsmodels.nonparametric.smoothers_lowess
+# from scipy.interpolate import interp1d
+# import statsmodels.nonparametric.smoothers_lowess
 from .constrained_smoothspline import constrained_smoothspline
+
 
 def ode_solver(time_vec, initial_value, times, X, model,
                target, coefs, included_vars=None,
                smooth_type="smoothing_spline",
                reltol=1e-10, abstol=1e-16):
-    
-    if included_vars==None:
+
+    if included_vars is None:
         included_vars = np.arange(X.shape[1])
 
     ## Fit spline on each predictor
     if smooth_type == "smoothing_spline":
         splinefun = [
-            constrained_smoothspline(y=X[:,j], 
-                                     times=times, 
+            constrained_smoothspline(y=X[:, j],
+                                     times=times,
                                      pen_degree=2,
                                      times_new=times,
-                                     constraint="none")['trained_fit'] 
+                                     constraint="none")['trained_fit']
             for j in included_vars
         ]
-        splinefun = [lambda t,fit=fit: fit.predict(np.array([t])) for fit in splinefun]
+        splinefun = [lambda t, fit=fit: fit.predict(np.array([t])) for fit in splinefun]
         # without fit=fit, error occures,
         # for detail, go to https://docs.python-guide.org/writing/gotchas/#late-binding-closures
-        
+
     # Local Polynomial Regression is not currently supported
     # no popular package of python supports Local Polynomial Regression
     #
@@ -98,16 +96,16 @@ def ode_solver(time_vec, initial_value, times, X, model,
 
     elif smooth_type == "linear":
         splinefun = [
-            scipy.interpolate.interp1d(times, X[:,j], kind="linear") 
+            scipy.interpolate.interp1d(times, X[:, j], kind="linear")
             for j in included_vars
         ]
 
     elif smooth_type == "constant":
         splinefun = [
-            scipy.interpolate.interp1d(times, X[:,j], kind="nearest") 
+            scipy.interpolate.interp1d(times, X[:, j], kind="nearest")
             for j in included_vars
         ]
-        
+
     ## Construct RHS
     def odefun(t, y):
         deriv = 0
@@ -117,19 +115,20 @@ def ode_solver(time_vec, initial_value, times, X, model,
                 if var == target:
                     tmp = tmp*y
                 else:
-                    tmp = tmp*splinefun[int(np.arange(len(included_vars))[var == included_vars])](t)
+                    tmp = tmp*splinefun[int(
+                        np.arange(len(included_vars))[var == included_vars])](t)
                 ####
             ####
             deriv += coefs[term]*tmp
         return(deriv)
 
     ## Solve ODE
-    result = scipy.integrate.solve_ivp(y0 = initial_value, 
-                                       fun = odefun, 
-                                       t_span=[time_vec.min(),time_vec.max()], 
-                                       t_eval=time_vec, 
-                                       rtol=reltol, atol=abstol
-                                      )
-    odefit = np.concatenate([result.t.reshape([-1,1]), result.y.T], axis=1)
-        
+    result = scipy.integrate.solve_ivp(y0=initial_value,
+                                       fun=odefun,
+                                       t_span=[time_vec.min(), time_vec.max()],
+                                       t_eval=time_vec,
+                                       rtol=reltol, atol=abstol)
+    print(result)
+    odefit = np.concatenate([result.t.reshape([-1, 1]), result.y.T], axis=1)
+
     return odefit

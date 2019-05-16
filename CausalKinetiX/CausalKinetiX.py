@@ -78,65 +78,78 @@ def CausalKinetiX(D,
                   env,
                   target,
                   models=None,
-                  max_preds=False,
-                  expsize=2,
-                  interactions=False,
-                  products=False,
-                  include_vars=None,
-                  maineffect_models=True,
-                  rm_target=False,
-                  screening=None,
-                  K=None,
-                  regression_class=None ):
-    
-    # for random forest regression remove interactions
-    if regression_class == "random_forest":
-        interactions = False
-        interactions_Y = False
-        include_intercept <- False
-    if regression_class == None:
-        regression_class = 'OLS'
-    
+                  pars={}):
+
+    ## Set parameter defaults
+    if 'max_preds' not in pars.keys():
+        pars['max_preds'] = False
+    if 'expsize' not in pars.keys():
+        pars['expsize'] = 2
+    if 'interactions' not in pars.keys():
+        pars['interactions'] = False
+    if 'products' not in pars.keys():
+        pars['products'] = False
+    if 'include_vars' not in pars.keys():
+        pars['include_vars'] = None
+    if 'maineffect_models' not in pars.keys():
+        pars['maineffect_models'] = True
+    if 'rm_target' not in pars.keys():
+        pars['rm_target'] = False
+    if 'screening' not in pars.keys():
+        pars['screening'] = None
+    if 'K' not in pars.keys():
+        pars['K'] = None
+    if 'regression_class' in pars.keys():
+        # for random forest regression remove interactions
+        if pars['regression_class'] == 'random_forest':
+            pars['interactions'] = False
+            pars['interactions_Y'] = False
+            pars['include_intercept'] = False
+
     # read out variables
     n = D.shape[0]
     L = len(times)
-    d = D.shape[1]//L  
+    d = D.shape[1]//L
+    maineffect_models = pars['maineffect_models']
+    screening = pars['screening']
+    interactions = pars['interactions']
+    products = pars['products']
+    include_vars = pars['include_vars']
+    max_preds = pars['max_preds']
+    expsize = pars['expsize']
+    K = pars['K']
 
     # Check whether a list of models was specified else generate models
-    if isinstance(models,type(None)):
+    if isinstance(models, type(None)):
         constructed_mods = construct_models(D, L, d, n, target, times,
-                                         maineffect_models,
-                                         screening,
-                                         interactions,
-                                         products,
-                                         include_vars,
-                                         max_preds,
-                                         expsize,
-                                         env)
+                                            maineffect_models,
+                                            screening,
+                                            interactions,
+                                            products,
+                                            include_vars,
+                                            max_preds,
+                                            expsize,
+                                            env)
         models = constructed_mods["models"]
-        if isinstance(K,type(None)):
+        if isinstance(K, type(None)):
             K = constructed_mods["num_terms"]-expsize
 
     # check whether parameter K was specified
-    if isinstance(K,type(None)):
+    if isinstance(K, type(None)):
         print("K was not specified and the default does not make sense for arbitrary lists of models. It was set to 1, but this can invalidate the variable ranking.")
         K = 1
 
     ###
     # Compute model scores
     ###
-    
-    
+
     model_scores = CausalKinetiX_modelranking(
-        D, 
-        times, 
-        env, 
-        target, 
-        models, 
-        include_vars = include_vars,
-        regression_class = regression_class,
-        #in R implementation, "mean" is used instead. 
-        score_type = "mean2"
+        D,
+        times,
+        env,
+        target,
+        models,
+        pars
     )
 
     ###
@@ -144,28 +157,23 @@ def CausalKinetiX(D,
     ###
 
     Mlen = len(models)
-    Mjlen = np.array([
-                    sum(sum([[([x] == term) for term in mod] for mod in models],[]))
-                for x in range(d)])
+    Mjlen = np.array([sum(sum([[([x] == term) for term in mod] for mod in models], []))
+                      for x in range(d)])
     # compute p-values based on hypergeometric distribution
     best_mods = np.array([[]]+models, dtype=np.object)[1:][model_scores.argsort()][range(K)]
-    counts = np.array([
-                        sum(sum([[[x] == term for term in mod] for mod in best_mods],[]))
-                    for x in range(d)])
-    var_scores = (1./K) * counts
-    var_pvals = np.array([
-                        scipy.stats.hypergeom.sf(counts[j], Mlen, Mjlen[j], K) 
-                    for j in range(d)])
+    counts = np.array([sum(sum([[[x] == term for term in mod] for mod in best_mods], []))
+                       for x in range(d)])
+    var_pvals = np.array([scipy.stats.hypergeom.sf(counts[j], Mlen, Mjlen[j], K)
+                          for j in range(d)])
 
-    var_pvals[Mjlen==0] = np.Infinity
+    var_pvals[Mjlen == 0] = np.Infinity
 
     idx = var_pvals.argsort()
     ranking = np.arange(d)[idx]
     scores = var_pvals[idx]
 
-       
     # output results
-    return({"models":models,
-          "model_scores":model_scores,
-          "variable_scores":scores,
-          "ranking":ranking})
+    return({"models": models,
+            "model_scores": model_scores,
+            "variable_scores": scores,
+            "ranking": ranking})

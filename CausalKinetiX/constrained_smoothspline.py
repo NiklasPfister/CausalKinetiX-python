@@ -42,7 +42,7 @@ Examples
                                    num_folds=2,
                                    lambd="optim")
 >>> plt.plot(np.linspace(0,10,1001), fit["smooth_vals_new"])
-                                   
+
 Notes
 -----
 For further details see the following references.
@@ -52,12 +52,12 @@ Identifying Causal Structure in Large-Scale Kinetic Systems
 """
 
 import numpy as np
-from scipy.interpolate import  BSpline
-from matplotlib import pyplot as plt
+# from scipy.interpolate import BSpline
+# from matplotlib import pyplot as plt
 from .BSbasis import get_BSbasis, get_basis_matrix, get_deriv_matrix, get_penalty_matrix
 import numbers
 from quadprog import solve_qp
-from scipy.optimize import minimize 
+from scipy.optimize import minimize
 
 
 def constrained_smoothspline(y,
@@ -68,47 +68,41 @@ def constrained_smoothspline(y,
                              initial_value=None,
                              times_new=None,
                              num_folds="leave-one-out",
-                             lambd="optim"
-                             ,plot=False #needs to be deleted. only for debug
-                            ):    
-    
-    #assert(times_new!=None)
-    
+                             lambd="optim"):
+
     ## Reorder data and deal with repetitions
-    times, idx, cnt = np.unique(times, return_inverse=True, return_counts=True)# automatically sorted
+    # automatically sorted
+    times, idx, cnt = np.unique(times, return_inverse=True, return_counts=True)
     y_mean = np.zeros(len(times))
-    
+
     if not derivative_values is None:
-        if len(derivative_values.shape)==1:
+        if len(derivative_values.shape) == 1:
             derivative_values_mean = np.zeros([len(times)])
-        if len(derivative_values.shape)==2:
-            derivative_values_mean = np.zeros([len(times),2])
-    
+        if len(derivative_values.shape) == 2:
+            derivative_values_mean = np.zeros([len(times), 2])
+
     for i in range(len(y)):
         y_mean[idx[i]] += y[i]/cnt[idx[i]]
         if not derivative_values is None:
-            if len(derivative_values.shape)==1:
+            if len(derivative_values.shape) == 1:
                 derivative_values_mean[idx[i]] += derivative_values[i]/cnt[idx[i]]
-            if len(derivative_values.shape)==2:
-                derivative_values_mean[idx[i],:] += derivative_values[i,:]/cnt[idx[i]]
+            if len(derivative_values.shape) == 2:
+                derivative_values_mean[idx[i], :] += derivative_values[i, :]/cnt[idx[i]]
     y = y_mean
     if not derivative_values is None:
         derivative_values = derivative_values_mean
 
-    ## Initialize some variables
-    order_splines = pen_degree+2
-
     ## Construct folds for CV
-    if num_folds=="leave-one-out":
+    if num_folds == "leave-one-out":
         folds = {}
         for i in range(len(times)):
             folds[i] = [i]
         num_folds = len(folds)
     elif(isinstance(num_folds, int)):
-        if(num_folds>1):
-            folds = {f:[] for f in range(num_folds)}
-            for i in range(len(times)): 
-                folds[i%num_folds].append(i) 
+        if(num_folds > 1):
+            folds = {f: [] for f in range(num_folds)}
+            for i in range(len(times)):
+                folds[i % num_folds].append(i)
         else:
             raise Exception("num_folds should be at least 2")
     else:
@@ -118,7 +112,7 @@ def constrained_smoothspline(y,
     def make_posdef(A, mineig=10**(-8)):
         aa = np.linalg.eigvalsh(A)
         if min(aa) < mineig:
-            #print("Spline matrix is not (numerically) positive definite and has been adjusted.")
+            # print("Spline matrix is not (numerically) positive definite and has been adjusted.")
             if min(aa) < 0:
                 A = A + np.diag([-min(aa) + mineig]*A.shape[0])
             else:
@@ -126,7 +120,7 @@ def constrained_smoothspline(y,
         return A
 
     ##############################
-    # 
+    #
     # Step 1: Set up spline basis for CV
     #
     ##############################
@@ -144,7 +138,7 @@ def constrained_smoothspline(y,
         Dmat_1 = {}
         Bmat_val = {}
         validation = {}
-        
+
         # compute the basis variables for each fold
         for i in range(num_folds):
             train = np.delete(np.arange(len(times)), folds[i])
@@ -156,27 +150,23 @@ def constrained_smoothspline(y,
             dvec[i] = train_y @ Bmat
             Dmat_1[i] = Bmat.T @ Bmat
             # define QP-variables according to constraint
-            if constraint=="fixed":
+            if constraint == "fixed":
                 meq[i] = len(train)
                 Amat[i] = Bmat_deriv.T
                 bvec[i] = derivative_values[train]
-            elif constraint=="bounded":
+            elif constraint == "bounded":
                 meq[i] = 0
                 Amat[i] = np.concatenate([Bmat_deriv,-Bmat_deriv]).T
                 bvec[i] = np.concatenate([derivative_values[train,0],-derivative_values[train,1]])
-            elif constraint=="none":
+            elif constraint == "none":
                 meq[i] = 0
                 Amat[i] = np.zeros_like(Bmat_deriv.T)
                 bvec[i] = np.zeros([len(train)])
             else:
-                raise(Exception("Specified constraint does not exist. Use either fixed of bounded."))    
-    if constraint=="none":
-        sol_index = 3
-    else:
-        sol_index = 1
+                raise(Exception("Specified constraint does not exist. Use either fixed of bounded."))
 
     ##############################
-    # 
+    #
     # Step 2: Define cost function for optimization of penalty lambda
     #
     ##############################
@@ -197,46 +187,46 @@ def constrained_smoothspline(y,
         rss = 0
         for i in range(num_folds):
             Dmat = Dmat_1[i] + Dmat_2
-            sc = np.linalg.norm(Dmat)#Frobenious norm
+            sc = np.linalg.norm(Dmat)
             Dmatsc = Dmat/sc
             # make sure that Dmatsc is pos.def
             Dmatsc = make_posdef(Dmatsc)
             # solve quadratic program with equality constraints
             solutions_qp = solve_qp(Dmatsc,
-                                   dvec[i]/sc,
-                                   Amat[i],
-                                   bvec[i],
-                                   meq[i])
+                                    dvec[i]/sc,
+                                    Amat[i],
+                                    bvec[i],
+                                    meq[i])
             csol = solutions_qp[0]
             # compute validation error
             rss = rss + np.sum((y[validation[i]]-Bmat_val[i]@csol)**2)
         return(rss/num_folds)
 
-    #needs to be deleted. only for debug
-    if plot==True:
-        print("plot=True is just for debugging of optimization of optimization of penalty parameter.")
-        x = np.linspace(0,4,100)
-        #print([cost_function(xx) for xx in x])
-        from matplotlib import pyplot as plt
-        plt.plot(r*256**(3*x-1), [cost_function(xx) for xx in x])
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel('lambda')
-        plt.ylabel('cost')
+    # # needs to be deleted. only for debug
+    # if plot:
+    #     print("plot=True is just for debugging
+    # of optimization of optimization of penalty parameter.")
+    #     # x = np.linspace(0, 4, 100)
+    #     # # print([cost_function(xx) for xx in x])
+    #     # from matplotlib import pyplot as plt
+    #     # plt.plot(r*256**(3*x-1), [cost_function(xx) for xx in x])
+    #     # plt.xscale('log')
+    #     # plt.yscale('log')
+    #     # plt.xlabel('lambda')
+    #     # plt.ylabel('cost')
 
-    
     ##############################
-    # 
+    #
     # Step 3: Compute lambda
     #
     ##############################
 
-    if lambd=="optim":
-        solutions_optim = minimize(fun=cost_function, x0=1.0, method="Nelder-Mead")#bracket=[lower_spar, upper_spar]
+    if lambd == "optim":
+        solutions_optim = minimize(fun=cost_function, x0=1.0, method="Nelder-Mead")
         spar = solutions_optim["x"]
         lambd = r*256**(3*spar-1)
-    elif(lambd=="grid_search"):
-        #lambda.vec = 10**(seq(log(lower.lambda)/log(10),log(upper.lambda)/log(10), by = 0.05))
+    elif(lambd == "grid_search"):
+        # lambda.vec = 10**(seq(log(lower.lambda)/log(10),log(upper.lambda)/log(10), by = 0.05))
         spar_vec = np.linspace(lower_spar, upper_spar, 100)
         RSS_vec = np.zeros([len(spar_vec)])
         for kkk in range(len(spar_vec)):
@@ -261,7 +251,7 @@ def constrained_smoothspline(y,
         print("There was at least one case in which CV yields a lambda at the upper boundary.")
 
     ##############################
-    # 
+    #
     # Step 4: Smoothing based on lambda
     #
     ##############################
@@ -275,15 +265,15 @@ def constrained_smoothspline(y,
     Dmat = Dmat_1 + Dmat_2
     sc = np.linalg.norm(Dmat)
     Dmatsc = Dmat/sc
-    if constraint=="fixed":
+    if constraint == "fixed":
         meq = len(times)
         Amat = Bmat_deriv.T
         bvec = derivative_values
-    elif constraint=="bounded":
+    elif constraint == "bounded":
         meq = 0
-        Amat = np.concatenate([Bmat_deriv,-Bmat_deriv]).T
-        bvec = np.concatenate([derivative_values[:,0],-derivative_values[:,1]])
-    elif constraint=="none":
+        Amat = np.concatenate([Bmat_deriv, -Bmat_deriv]).T
+        bvec = np.concatenate([derivative_values[:, 0], -derivative_values[:, 1]])
+    elif constraint == "none":
         meq = 0
         Amat = np.zeros_like(Bmat_deriv.T)
         bvec = np.zeros([len(times)])
@@ -291,17 +281,18 @@ def constrained_smoothspline(y,
     # add initial value as constraint
     if not initial_value is None:
         meq = meq+1
-        Amat = np.concatenate([Amat, np.append([1], np.zeros([Amat.shape[0]-1])).reshape([-1,1])], axis=1)
+        Amat = np.concatenate([Amat, np.append([1], np.zeros(
+            [Amat.shape[0]-1])).reshape([-1, 1])], axis=1)
         bvec = np.append(bvec, [initial_value])
 
     # make sure Dmatsc is pos.def.
     Dmatsc = make_posdef(Dmatsc)
     # solve quadratic program depending on constraint
     solutions_qp = solve_qp(Dmatsc,
-                           dvec/sc,
-                           Amat,
-                           bvec,
-                           meq)
+                            dvec/sc,
+                            Amat,
+                            bvec,
+                            meq)
     csol = solutions_qp[0]
     # smoothed values at times.new
     Bmat_new = get_basis_matrix(times_new, basis)
@@ -311,29 +302,27 @@ def constrained_smoothspline(y,
     # smoothed derivative values
     smooth_deriv = Bmat_deriv @ csol
     # residuals
-    residuals = (y-smoothed_spline_values) 
-   
+    residuals = (y-smoothed_spline_values)
 
     ################################
     #
     # Only for Python implementation
     #
     ################################
-    
+
     class trained_fit:
         def __init__(self, basis, csol):
             self.basis = basis
             self.csol = csol
 
-        def predict(self,times_new):
+        def predict(self, times_new):
             Bmat_new = get_basis_matrix(times_new, self.basis)
             return Bmat_new @ self.csol
 
-    return {"smooth_vals":smoothed_spline_values,
-            "residuals":residuals,
-            "smooth_vals_new":predict_values,
-            "smooth_deriv":smooth_deriv,
-            "pen_par":lambd,
+    return {"smooth_vals": smoothed_spline_values,
+            "residuals": residuals,
+            "smooth_vals_new": predict_values,
+            "smooth_deriv": smooth_deriv,
+            "pen_par": lambd,
             # Only for Python implementation
-            "trained_fit":trained_fit(basis, csol)
-           }
+            "trained_fit": trained_fit(basis, csol)}

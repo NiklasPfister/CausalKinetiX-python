@@ -63,7 +63,6 @@ Identifying Causal Structure in Large-Scale Kinetic Systems
 (https://arxiv.org/pdf/1810.11776.pdf)
 """
 
-
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize_scalar
@@ -75,33 +74,79 @@ from copy import deepcopy
 from .constrained_smoothspline import constrained_smoothspline
 from .utils import extend_Dmat
 
+
 def CausalKinetiX_modelranking(D,
                                times,
                                env,
                                target,
                                models,
-                               pen_degree=2,
-                               num_folds=2,
-                               include_vars=None,
-                               include_intercept=False,
-                               average_reps=False,
-                               smooth_X=False,
-                               smooth_Y=False,
-                               regression_class="OLS",
-                               sample_splitting="loo",
-                               score_type="mean",
-                               integrated_model=True,
-                               splitting_env=None,
-                               weight_vec=None,
-                               set_initial=False,
-                               silent=True,
-                               show_plot=False):
+                               pars={}):
 
-    ## Set default parameter
-    if isinstance(weight_vec, type(None)):
-        weight_vec = np.ones([len(env)])
-    if splitting_env is None:
+    ## Read out parameters and set parameter defaults
+    if 'pen_degree' not in pars.keys():
+        pen_degree = 2
+    else:
+        pen_degree = pars['pen_degree']
+    if 'num_folds' not in pars.keys():
+        num_folds = 2
+    else:
+        num_folds = pars['num_folds']
+    if 'include_vars' not in pars.keys():
+        include_vars = None
+    else:
+        include_vars = pars['include_vars']
+    if 'include_intercept' not in pars.keys():
+        include_intercept = False
+    else:
+        include_intercept = pars['include_intercept']
+    if 'average_reps' not in pars.keys():
+        average_reps = False
+    else:
+        average_reps = pars['average_reps']
+    if 'smooth_X' not in pars.keys():
+        smooth_X = False
+    else:
+        smooth_X = pars['smooth_X']
+    if 'smooth_Y' not in pars.keys():
+        smooth_Y = False
+    else:
+        smooth_Y = pars['smooth_Y']
+    if 'regression_class' not in pars.keys():
+        regression_class = 'OLS'
+    else:
+        regression_class = pars['regression_class']
+    if 'sample_splitting' not in pars.keys():
+        sample_splitting = 'loo'
+    else:
+        sample_splitting = pars['sample_splitting']
+    if 'score_type' not in pars.keys():
+        score_type = 'mean_absolute'
+    else:
+        score_type = pars['score_type']
+    if 'integrated_model' not in pars.keys():
+        integrated_model = True
+    else:
+        integrated_model = pars['integrated_model']
+    if 'splitting_env' not in pars.keys():
         splitting_env = deepcopy(env)
+    else:
+        splitting_env = pars['splitting_env']
+    if 'weight_vec' not in pars.keys():
+        weight_vec = np.ones([len(env)])
+    else:
+        weight_vec = pars['weight_vec']
+    if 'set_initial' not in pars.keys():
+        set_initial = False
+    else:
+        set_initial = pars['set_initial']
+    if 'silent' not in pars.keys():
+        silent = True
+    else:
+        silent = pars['silent']
+    if 'show_plot' not in pars.keys():
+        show_plot = False
+    else:
+        show_plot = pars['show_plot']
 
     ## Parameter consistency checks
     if(smooth_Y and (not isinstance(splitting_env, type(None)))):
@@ -130,9 +175,12 @@ def CausalKinetiX_modelranking(D,
 
     # sort environments to increasing order
     splitting_env.sort()
-    D = D[splitting_env, ]
+    env_order = np.argsort(env)
+    D = D[env_order, ]
+    splitting_env = [splitting_env[k] for k in env_order]
+    env = [env[k] for k in env_order]
     if smooth_Y:
-        weight_vec = weight_vec[list(set(env))] #list(set(*)) is equivalent to order(unique(*))
+        weight_vec = weight_vec[np.argsort(list(set(env)))]
     else:
         weight_vec = weight_vec[splitting_env]
 
@@ -163,37 +211,35 @@ def CausalKinetiX_modelranking(D,
     #
     #################################################
 
-    ## Averaging
-    
     ## use averaging on environments
     if average_reps:
         unique_env = list(set(env))
-        D_new = np.zeros([len(unique_env),D.shape[1]])
-        DmatY_new = np.zeros([len(unique_env),L])
-        
+        D_new = np.zeros([len(unique_env), D.shape[1]])
+        DmatY_new = np.zeros([len(unique_env), L])
         for i in range(len(unique_env)):
-            D_new[i,:] = D[env == unique_env[i],:].mean(axis=1)
-            D_new[i,:] = D[env == unique_env[i],:].mean(axis=1)
-        
+            D_new[i, :] = D[env == unique_env[i], :].mean(axis=0)
+            DmatY_new[i, :] = DmatY[env == unique_env[i], :].mean(axis=0)
         splitting_env = list(set(splitting_env))
+        D = D_new
+        DmatY = DmatY_new
         env = unique_env
         n = len(env)
 
     ## Smoothing
     Dlist = np.zeros([n], np.object)
-    if smooth_X==True:
+    if smooth_X:
         for i in range(n):
-            Dlist[i] = D[i,].reshape([dtot, L]).T
+            Dlist[i] = D[i, ].reshape([dtot, L]).T
             # smooth X-values
             for j in range(dtot):
-                na_ind = np.isnan(Dlist[i][:,j])
-                f_approx = interp1d(times[~na_ind], Dlist[i][~na_ind,j], kind="cubic")
-                Dlist[i][:,j] = f_approx(times)
+                na_ind = np.isnan(Dlist[i][:, j])
+                f_approx = interp1d(times[~na_ind], Dlist[i][~na_ind, j], kind="cubic")
+                Dlist[i][:, j] = f_approx(times)
 
     ## without smoothing
     else:
         for i in range(n):
-            Dlist[i] = D[i,:].reshape([dtot, L]).T
+            Dlist[i] = D[i, :].reshape([dtot, L]).T
 
     ######################################
     #
@@ -201,7 +247,7 @@ def CausalKinetiX_modelranking(D,
     #
     #####################################
 
-    if smooth_Y==True:
+    if smooth_Y:
         # initialize variables
         unique_env = list(set(env))
         num_env = len(unique_env)
@@ -215,7 +261,7 @@ def CausalKinetiX_modelranking(D,
         initial_values = np.zeros([num_env])
         times_new = np.array([0])
 
-        if(silent==False or show_plot==True):
+        if(not silent or show_plot):
             Ya = np.zeros([num_env], dtype=np.object)
             Yb = np.zeros([num_env], dtype=np.object)
             times_new = np.linspace(min(times), max(times), 100)
@@ -225,30 +271,30 @@ def CausalKinetiX_modelranking(D,
 
         for i in range(len(unique_env)):
             # fit higher order model to compute derivatives (based on sm.smooth)
-            Ylist[i] = DmatY[env==unique_env[i],:].reshape([-1])
-            len_env = sum(env==unique_env[i])
+            Ylist[i] = DmatY[env == unique_env[i], :].reshape([-1])
+            len_env = sum(env == unique_env[i])
             envtimes[i] = np.array(list(times)*len_env)
             fit = constrained_smoothspline(Ylist[i],
-                                          envtimes[i],
-                                          pen_degree[1],
-                                          constraint="none",
-                                          times_new=times_new,
-                                          num_folds=num_folds,
-                                          lambd="optim")
-            if(silent==False or show_plot==True):
+                                           envtimes[i],
+                                           pen_degree[1],
+                                           constraint="none",
+                                           times_new=times_new,
+                                           num_folds=num_folds,
+                                           lambd="optim")
+            if(not silent or show_plot):
                 Yb[i] = fit["smooth_vals_new"]
 
             dYlist[i] = np.array(list(fit["smooth_deriv"])*len_env)
             # compute differences for intergrated model fit
-            if integrated_model==True:
-                dYlist[i] = DmatY[env==unique_env[i],1:] - DmatY[env==unique_env[i],:-1]
+            if integrated_model:
+                dYlist[i] = DmatY[env == unique_env[i], 1:] - DmatY[env == unique_env[i], :-1]
 
-            if(silent==False or show_plot==True):
+            if(not silent or show_plot):
                 Ya[i] = fit["smooth_vals_new"]
 
             lambd[i] = fit["pen_par"]
-            if set_initial==True:
-                initial_values[i] = fit["smooth_vals"][0,0]
+            if set_initial:
+                initial_values[i] = fit["smooth_vals"][0, 0]
 
             else:
                 initial_values[i] = None
@@ -267,7 +313,7 @@ def CausalKinetiX_modelranking(D,
         lambd = np.zeros([n])
         initial_values = np.zeros([n])
         times_new = np.array([0])
-        if (silent==False or show_plot==True):
+        if(not silent or show_plot):
             Ya = np.zeros([n], dtype=np.object)
             Yb = np.zeros([n], dtype=np.object)
             times_new = np.linspace(min(times), max(times), 100)
@@ -278,58 +324,57 @@ def CausalKinetiX_modelranking(D,
 
         for i in range(n):
             # fit higher order model to compute derivatives (based on sm.smooth)
-            Ylist[i] = DmatY[i,:]
+            Ylist[i] = DmatY[i, :]
             na_ind = np.isnan(Ylist[i])
             fit = constrained_smoothspline(Ylist[i][~na_ind],
-                                          times[~na_ind],
-                                          pen_degree[0],
-                                          constraint="none",
-                                          times_new=times_new,
-                                          num_folds=num_folds,
-                                          lambd="optim")
-            if(silent==False or show_plot==True):
+                                           times[~na_ind],
+                                           pen_degree[0],
+                                           constraint="none",
+                                           times_new=times_new,
+                                           num_folds=num_folds,
+                                           lambd="optim")
+            if(not silent or show_plot):
                 Yb[i] = fit["smooth_vals_new"]
 
             dYlist[i] = fit["smooth_deriv"]
-            
+
             # compute differences for intergrated model fit
-            if integrated_model==True:
+            if integrated_model:
                 dYlist[i] = Ylist[i][1:] - Ylist[i][:-1]
-                
+
             # fit the reference model and compute penalty par and RSS
             if(pen_degree[0] != pen_degree[1]):
                 fit = constrained_smoothspline(Ylist[i][~na_ind],
-                                            times[~na_ind],
-                                            pen_degree[1],
-                                            constraint="none",
-                                            times_new=times_new,
-                                            num_folds=num_folds,
-                                            lambd="optim")
+                                               times[~na_ind],
+                                               pen_degree[1],
+                                               constraint="none",
+                                               times_new=times_new,
+                                               num_folds=num_folds,
+                                               lambd="optim")
 
-            if(silent==False or show_plot==True):
+            if(not silent or show_plot):
                 Ya[i] = fit["smooth_vals_new"]
 
             lambd[i] = fit["pen_par"]
-            if set_initial==True:
+            if set_initial:
                 initial_values[i] = fit["smooth_vals"][0,0]
 
             else:
                 initial_values[i] = None
 
-
             RSS_A[i] = sum(fit["residuals"]**2)
             UpDown_A[i] = fit["smooth_vals"][-1]
-            RSS3_A[i] = sum(fit["residuals"][[0, int(len(fit["residuals"])/2)-1, len(fit["residuals"])-1]]**2)
+            RSS3_A[i] = sum(fit["residuals"][[0, int(len(fit["residuals"])/2)-1,
+                                              len(fit["residuals"])-1]]**2)
 
-            
     ######################################
     #
-    # Step 3: Pre-compute models 
+    # Step 3: Pre-compute models
     #
     ######################################
 
     # convert models to modelstot
-    if type(models[0])==list:
+    if type(models[0]) == list:
         modelstot = models
 
     else:
@@ -345,47 +390,45 @@ def CausalKinetiX_modelranking(D,
 
     # iteration over all potential models
     for model in range(num_models):
-        if len(np.array(modelstot[model]))==0:
+        if len(np.array(modelstot[model])) == 0:
             model_index = []
         else:
             # for utility
             match = lambda pattern, matched: np.arange(len(matched))[np.equal(
-                    np.array([[]]+list(pattern))[1:].reshape([-1,1]), 
-                    np.array([[]]+list(matched))[1:].reshape([1,-1])
-                ).sum(axis=0)>0]
+                np.array([[]]+list(pattern))[1:].reshape([-1, 1]),
+                np.array([[]]+list(matched))[1:].reshape([1, -1])
+            ).sum(axis=0) > 0]
             model_index = match(modelstot[model], ordering)
-            
-    ##}
 
     ## collect predictors X
         Xlist = np.zeros([n], dtype=np.object)
         num_pred = len(modelstot[model])+include_intercept
-        if num_pred==0:
+        if num_pred == 0:
             num_pred = 1
             for i in range(n):
-                Xlist[i] = np.ones([L,1])
+                Xlist[i] = np.ones([L, 1])
         else:
             for i in range(n):
                 Xlist[i] = Dlist[i][:, model_index]
-                if include_intercept==True:
-                    Xlist[i] = np.concatenate([Xlist[i], np.ones([L,1])], axis=1)
+                if include_intercept:
+                    Xlist[i] = np.concatenate([Xlist[i], np.ones([L, 1])], axis=1)
         data_list[model] = Xlist
 
         # compute predictors for integrated model fit
-        if integrated_model==True:
+        if integrated_model:
             Xlist2 = np.zeros([n], dtype=np.object)
             num_pred = len(modelstot[model])+include_intercept
-            if num_pred==0:
+            if num_pred == 0:
                 num_pred = 1
                 for i in range(n):
-                    Xlist2[i] = np.ones([L-1,1])          
+                    Xlist2[i] = np.ones([L-1, 1])
             else:
                 for i in range(n):
                     Xlist2[i] = Dlist[i][:, model_index]
-                    tmp = (Xlist2[i][0:(L-1),:] + Xlist2[i][1:L,:]) / 2
+                    tmp = (Xlist2[i][0:(L-1), :] + Xlist2[i][1:L, :]) / 2
                     Xlist2[i] = tmp * np.diff(times).reshape(L-1, 1)
-                    if include_intercept==True:
-                        Xlist2[i] = np.concatenate([Xlist2[i], np.ones([L-1,1])], axis=1)
+                    if include_intercept:
+                        Xlist2[i] = np.concatenate([Xlist2[i], np.ones([L-1, 1])], axis=1)
             data_list2[model] = Xlist2
 
     ######################################
@@ -401,11 +444,11 @@ def CausalKinetiX_modelranking(D,
         if 'Xlist2' in locals():
             Xlist2 = data_list2[model]
         # output
-        if(silent==False):
+        if(not silent):
             print("Scoring model "+str(modelstot[model]))
 
         ## Compute constraint and RSS on constrained model
-        if sample_splitting=="none":
+        if sample_splitting == "none":
             ###
             # Without sample splitting
             ###
@@ -417,38 +460,41 @@ def CausalKinetiX_modelranking(D,
             X = np.concatenate(list(Xlist))
             Xpred = np.concatenate(list(Xlist))
             dY = np.concatenate(list(dYlist)).reshape([-1])
-            subenv_ind = [np.array(list(range(sum(splitting_env==unique_env[k]))) * L) for k in range(num_env)]
-            loo_ind = np.repeat(list(splitting_env),L)
+            subenv_ind = [np.array(list(range(sum(splitting_env == unique_env[k]))) * L)
+                          for k in range(num_env)]
+            loo_ind = np.repeat(list(splitting_env), L)
             # adjust for missing obs in integrated model fit
-            if 'Xlist2' in locals(): # check if 'Xlist2' is defined
+            # check if 'Xlist2' is defined
+            if 'Xlist2' in locals():
                 X = np.concatenate(Xlist2)
                 loo_ind2 = loo_ind
                 loo_ind = np.array((splitting_env)*(L-1))
             count = 0
             ### PLOT
-            if show_plot==True:
+            if show_plot:
                 minyplot = np.zeros([len(RSS_A)])
                 maxyplot = np.zeros([len(RSS_A)])
                 constrained_fit = np.zeros([len(RSS_A)], dtype=np.object)
 
         # Fit model on all data
             # Classical OLS regression (main effects and interactions)
-            if regression_class=="OLS":
-                fit = LinearRegression(fit_intercept=False).fit(X,dY)
-                # remove coefficients resulting from singular fits (perfectly correlated predictors)
+            if regression_class == "OLS":
+                fit = LinearRegression(fit_intercept=False).fit(X, dY)
+                # remove coefficients resulting from singular fits
+                # (perfectly correlated predictors)
                 coefs = fit.coef_
                 coefs[np.isnan(coefs)] = 0
                 fitted_dY = Xpred @ coefs
 
             # OLS regression with sign constraints on parameters
-            elif regression_class=="signed_OLS":
+            elif regression_class == "signed_OLS":
                 len_model = len(modelstot[model][0])
                 tmp = np.array([v[0] for v in modelstot[model][0]])
                 ind = np.ones([len_model])
-                ind[tmp==target] = -1
+                ind[tmp == target] = -1
                 # define quadProg parameters
                 bvec = np.zeros([len_model])
-                Amat = diag(ind)
+                Amat = np.diag(ind)
                 dvec = dY.reshape([1, nrow(X)]) @ X
                 Dmat = (X.T @ X)
                 fit = solve_qp(Dmat, dvec, Amat, bvec, meq=0)
@@ -456,18 +502,18 @@ def CausalKinetiX_modelranking(D,
                 fitted_dY = Xpred @ coefs
 
             # OLS regression with pruning based on score
-            elif regression_class=="optim":
+            elif regression_class == "optim":
                 # define loss function
                 def loss_fun(beta, Y, X, env_vec, ind):
                     coefs = (10**beta)*ind
                     tmp_vec = (Y - X @ coefs)**2
-                    return tmp_vec.reshape([len(env_vec),-1]).mean(axis=1).max(axis=0)
+                    return tmp_vec.reshape([len(env_vec), -1]).mean(axis=1).max(axis=0)
 
                 # compute starting value using quadratic program
                 len_model = len(modelstot[model][0])
                 tmp = np.array([x[0] for x in modelstot[model][0]])
-                ind = rep(1, len_model)
-                ind[tmp==target] = -1
+                ind = np.ones([len_model])
+                ind[tmp == target] = -1
                 bvec = np.array([10**(-10)] * len_model)
                 Amat = np.diag(ind)
                 dvec = dY.reshape([1, X.shape[0]]) @ X
@@ -477,14 +523,14 @@ def CausalKinetiX_modelranking(D,
 
                 # perform optimization
                 opt_res = minimize_scalar(fun = lambda beta:loss_fun(beta, dY, X, splitting.env, ind),
-                                bracket = [-10,log(coefs*ind)/log(10),5], 
+                                bracket = [-10,log(coefs*ind)/log(10),5],
                                 method = "Golden")
                 coefs = (10**opt_res.x)*ind
                 fitted_dY = Xpred @ coefs
 
             # Random forest regression
-            elif regression_class=="random_forest":
-                fit = RandomForestRegressor().fit(X,dY)
+            elif regression_class == "random_forest":
+                fit = RandomForestRegressor().fit(X, dY)
                 fitted_dY = fit.predict(Xpred)
 
             # Wrong regression_class
@@ -492,57 +538,58 @@ def CausalKinetiX_modelranking(D,
                 raise(Exception("Specified regression_class does not exist_ Use OLS, OLS_prune or random_forest_"))
         # fitting section ends here
         # compute score using splitting environment
-            if smooth_Y==False:
+            if not smooth_Y:
                 for i in range(num_env):
-                    num_reps = sum(splitting_env==unique_env[i])
-                    env_ind = (loo_ind2==unique_env[i])
+                    num_reps = sum(splitting_env == unique_env[i])
+                    env_ind = (loo_ind2 == unique_env[i])
                     for j in range(num_reps):
-                        fitted_dY_tmp = fitted_dY[env_ind][subenv_ind[i]==j]
+                        fitted_dY_tmp = fitted_dY[env_ind][subenv_ind[i] == j]
                         fit = constrained_smoothspline(Ylist[count],
-                                                    times,
-                                                    pen_degree[1],
-                                                    constraint="fixed",
-                                                    derivative_values=fitted_dY_tmp,
-                                                    initial_value=initial_values[count],
-                                                    times_new=times_new,
-                                                    num_folds=num_folds,
-                                                    lambd=lambd[count])
+                                                       times,
+                                                       pen_degree[1],
+                                                       constraint="fixed",
+                                                       derivative_values=fitted_dY_tmp,
+                                                       initial_value=initial_values[count],
+                                                       times_new=times_new,
+                                                       num_folds=num_folds,
+                                                       lambd=lambd[count])
 
                         RSS_B[count] = sum(fit["residuals"]**2)
                         UpDown_B[count] = fit["smooth_vals"][len(fit["smooth_vals"])]
-                        RSS3_B[count] = sum(fit["residuals"][[0, int(len(fit["residuals"])/2), len(fit["residuals"])]]**2)
+                        RSS3_B[count] = sum(fit["residuals"][[0, int(len(fit["residuals"])/2),
+                                                              len(fit["residuals"])]]**2)
 
                         ### PLOT
-                        if show_plot==True:
-                            idx = np.arange(len(splitting_env))[splitting_env==unique_env[i]][j]
+                        if show_plot:
+                            idx = np.arange(len(splitting_env))[splitting_env == unique_env[i]][j]
                             constrained_fit[idx] = fit["smooth_vals_new"]
                         count += 1
                         
             else:
                 for i in range(num_env):
-                    num_reps = sum(splitting_env==unique_env[i])
-                    env_ind = (loo_ind2==unique_env[i])
-                    fitted_dY_tmp = fitted_dY[env_ind].reshape([L,-1]).mean(axis=1)
+                    num_reps = sum(splitting_env == unique_env[i])
+                    env_ind = (loo_ind2 == unique_env[i])
+                    fitted_dY_tmp = fitted_dY[env_ind].reshape([L, -1]).mean(axis=1)
 
                     fit = constrained_smoothspline(Ylist[i],
-                                              np.array(list(times)*num_reps),
-                                              pen_degree[1],
-                                              constraint="fixed",
-                                              derivative_values=fitted_dY_tmp,
-                                              initial_value=initial_values[i],
-                                              times_new=times_new,
-                                              num_folds=num_folds,
-                                              lambd=lambd[i])
+                                                   np.array(list(times)*num_reps),
+                                                   pen_degree[1],
+                                                   constraint="fixed",
+                                                   derivative_values=fitted_dY_tmp,
+                                                   initial_value=initial_values[i],
+                                                   times_new=times_new,
+                                                   num_folds=num_folds,
+                                                   lambd=lambd[i])
 
                     RSS_B[i] = sum((np.array(list(fit["smooth_vals"])*num_reps)-Ylist[i])**2)
                     UpDown_B[i] = fit["smooth_vals"][len(fit["smooth_vals"])-1]
                     RSS3_B[i] = None
-                    if show_plot==True:
+                    if show_plot:
                         constrained_fit[i] = fit["smooth_vals_new"]
 
-            ### PLOT 
-            if show_plot==True:
-                if smooth_Y==False:
+            ### PLOT
+            if show_plot:
+                if not smooth_Y:
                     for i in range(num_env):
                         env_ind = (splitting_env == unique_env[i])
                         Y1plot = Ylist[env_ind]
@@ -554,7 +601,7 @@ def CausalKinetiX_modelranking(D,
                         maxy = max(max_(tmp) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
                         
                         # plot
-                        plt.plot(times1, Y1plot,'o',c='black')
+                        plt.plot(times1, Y1plot, 'o', c='black')
                         plt.xlabel("times")
                         plt.ylabel("concentration")
                         plt.ylim([miny, maxy])
@@ -575,9 +622,8 @@ def CausalKinetiX_modelranking(D,
                         max_ = lambda ary_obj:max([max(obj) for obj in ary_obj])
                         miny = min(min_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
                         maxy = max(max_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
-                        
                         # plot
-                        plt.plot(times1, Ylist[i],'o',c='black')
+                        plt.plot(times1, Ylist[i], 'o', c='black')
                         plt.xlabel("times")
                         plt.ylabel("concentration")
                         plt.ylim([miny, maxy])
@@ -586,10 +632,9 @@ def CausalKinetiX_modelranking(D,
                             plt.plot(times_new, Ya[i], 'l', c="red")
                             plt.plot(times_new, Yb[i], 'l', c="blue")
                             plt.plot(times_new, constrained_fit[[i]], 'l', c="green")
-                        #readline("Press enter")
                         plt.show()
-                    
-        elif sample_splitting=="loo":
+
+        elif sample_splitting == "loo":
             ###
             # With leave-one-out sample splitting
             ###
@@ -600,56 +645,60 @@ def CausalKinetiX_modelranking(D,
             RSS3_B = np.zeros([len(RSS_A)])
             X = np.concatenate(Xlist)
             dY = np.array(list(dYlist)).reshape([-1])
-            
+
 # fixed from the following line, might be the cause of bug
 #           subenv_ind = [np.array(list(range(sum(splitting_env==unique_env[k])))*L) for k in range(num_env)]
-            subenv_ind = [np.repeat(list(range(sum(splitting_env==unique_env[k]))),L) for k in range(num_env)]
+            subenv_ind = [np.repeat(list(range(sum(splitting_env == unique_env[k]))), L)
+                          for k in range(num_env)]
             loo_ind = np.repeat(list(splitting_env), L)
             # adjust for missing obs in integrated model fit
-            if 'Xlist2' in locals(): # check if 'Xlist2' is defined
-                X2 = X                            
+            # check if 'Xlist2' is defined
+            if 'Xlist2' in locals():
+                X2 = X
                 X = np.concatenate(Xlist2)
                 loo_ind2 = loo_ind
-                loo_ind = np.array(list(splitting_env)*(L-1))  
+                loo_ind = np.array(list(splitting_env)*(L-1))
             count = 0
 
             ### PLOT
-            if show_plot==True:
+            if show_plot:
                 minyplot = np.zeros([len(RSS_A)])
                 maxyplot = np.zeros([len(RSS_A)])
                 constrained_fit = np.zeros([len(RSS_A)], dtype=np.object)
 
             for i in range(num_env):
                 # compute derivative constraint using OLS
-                dYout = dY[loo_ind!=unique_env[i]]
-                Xout = X[loo_ind!=unique_env[i],:]
-                env_out = loo_ind[loo_ind!=unique_env[i]]
-                Xin = X[loo_ind==unique_env[i],:]
+                dYout = dY[loo_ind != unique_env[i]]
+                Xout = X[loo_ind != unique_env[i], :]
+                env_out = loo_ind[loo_ind != unique_env[i]]
+                Xin = X[loo_ind == unique_env[i], :]
                 # adjust for missing vlaue in integrated model fit
-                if 'Xlist2' in locals(): # check if 'Xlist2' is defined
-                    Xin = X2[loo_ind2==unique_env[i],:]
+                # check if 'Xlist2' is defined
+                if 'Xlist2' in locals():
+                    Xin = X2[loo_ind2 == unique_env[i], :]
                 # dealing with na
-                Xout_nona = Xout[np.isnan(Xout).sum(axis=1)==0,:]
-                dYout_nona = dYout[np.isnan(Xout).sum(axis=1)==0]
-                env_out = env_out[np.isnan(Xout).sum(axis=1)==0]
+                Xout_nona = Xout[np.isnan(Xout).sum(axis=1) == 0, :]
+                dYout_nona = dYout[np.isnan(Xout).sum(axis=1) == 0]
+                env_out = env_out[np.isnan(Xout).sum(axis=1) == 0]
 
                 # Classical OLS regression (main effects and interactions)
-                if regression_class=="OLS":
+                if regression_class == "OLS":
                     fit = LinearRegression(fit_intercept=False).fit(Xout_nona, dYout_nona)
-                    # remove coefficients resulting from singular fits (perfectly correlated predictors)
+                    # remove coefficients resulting from singular fits
+                    # (perfectly correlated predictors)
                     coefs = fit.coef_
                     coefs[np.isnan(coefs)] = 0
                     fitted_dY = Xin @ coefs
 
                 # OLS regression with sign constraints on parameters
-                elif regression_class=="signed_OLS":
+                elif regression_class == "signed_OLS":
                     len_model = len(modelstot[model][0])
                     tmp = np.array([x[0] for x in modelstot[model][0]])
                     ind = np.ones([len_model])
-                    ind[tmp==target] = -1
+                    ind[tmp == target] = -1
                     # define quadProg parameters
                     bvec = np.zeros([len_model])
-                    Amat = diag(ind)
+                    Amat = np.diag(ind)
                     dvec = dYout_nona.reshape([1, Xout_nona.shape[0]]) @ Xout_nona
                     Dmat = Xout_nona.T @ Xout_nona
                     fit = solve_qp(Dmat, dvec, Amat, bvec, meq=0)
@@ -657,7 +706,7 @@ def CausalKinetiX_modelranking(D,
                     fitted_dY = Xin @ matrix(coefs, ncol(Xin), 1)
 
                 # OLS regression with pruning based on score
-                elif(regression_class=="optim"):
+                elif(regression_class == "optim"):
                     # define loss function
                     def loss_fun(beta, Y, X, env_vec, ind):
                         coefs = (10**beta)*ind
@@ -667,23 +716,23 @@ def CausalKinetiX_modelranking(D,
                     len_model = len(modelstot[model][0])
                     tmp = np.array(x[0] for x in [modelstot[model][0]])
                     ind = np.ones([len_model])
-                    ind[tmp==target] = -1
+                    ind[tmp == target] = -1
                     bvec = 10**(-10) * np.ones([len_model])
-                    Amat = diag(ind)
+                    Amat = np.diag(ind)
                     dvec = dYout_nona.reshape([1, nrow(Xout_nona)]) @ Xout_nona
                     Dmat = Xout_nona.T @ Xout_nona
                     fit = solve_qp(Dmat, dvec, Amat, bvec, meq=0)
                     coefs = fit.x
                     # perform optimization
-                    opt_res = minimize_scalar(fun = lambda beta:loss_fun(beta, dYout_nona, Xout_nona, env_out, ind),
-                                bracket = [-10,log(coefs*ind)/log(10),5], 
+                    opt_res = minimize_scalar(fun=lambda beta:loss_fun(beta, dYout_nona, Xout_nona, env_out, ind),
+                                bracket = [-10,log(coefs*ind)/log(10),5],
                                 method = "Golden")
 
                     fitted_dY = Xin @ coefs
 
                 # Random forest regression
-                elif regression_class=="random_forest":
-                    fit = RandomForestRegressor().fit(Xout_nona,dYout_nona)
+                elif regression_class == "random_forest":
+                    fit = RandomForestRegressor().fit(Xout_nona, dYout_nona)
                     fitted_dY = fit.predict(Xin)
 
                 # Wrong regression_class
@@ -691,54 +740,54 @@ def CausalKinetiX_modelranking(D,
                     stop("Specified regression_class does not exist_ Use OLS, OLS_prune or random_forest_")
 
                 # Fit individual models with derivative constraint
-                if smooth_Y==False:
-                    for j in range(sum(splitting_env==unique_env[i])):
+                if not smooth_Y:
+                    for j in range(sum(splitting_env == unique_env[i])):
                         na_ind = np.logical_or(
                             np.isnan(Ylist[count]),
-                            np.isnan(Xin[subenv_ind[i]==j,:]>0).sum(axis=1)
+                            np.isnan(Xin[subenv_ind[i] == j, :] > 0).sum(axis=1)
                         )
     
-                        fitted_dY_tmp = fitted_dY[subenv_ind[i]==j]
+                        fitted_dY_tmp = fitted_dY[subenv_ind[i] == j]
                         fit = constrained_smoothspline(Ylist[count][~na_ind],
-                                                        times[~na_ind],
-                                                        pen_degree[1],
-                                                        constraint="fixed",
-                                                        derivative_values=fitted_dY_tmp[~na_ind],
-                                                        initial_value=initial_values[count],
-                                                        times_new=times_new,
-                                                        num_folds=num_folds,
-                                                        lambd=lambd[count])
+                                                       times[~na_ind],
+                                                       pen_degree[1],
+                                                       constraint="fixed",
+                                                       derivative_values=fitted_dY_tmp[~na_ind],
+                                                       initial_value=initial_values[count],
+                                                       times_new=times_new,
+                                                       num_folds=num_folds,
+                                                       lambd=lambd[count])
 
                         RSS_B[count] = sum(fit["residuals"]**2)
                         UpDown_B[count] = fit["smooth_vals"][len(fit["smooth_vals"])-1]
                         RSS3_B[count] = sum(fit["residuals"][[1, int(len(fit['residuals'])/2), len(fit['residuals'])-1]]**2)
                         ### PLOT
-                        if show_plot==True:
-                            idx = np.arange(len(splitting_env))[splitting_env==unique_env[i]][j]
+                        if show_plot:
+                            idx = np.arange(len(splitting_env))[splitting_env == unique_env[i]][j]
                             constrained_fit[idx] = fit["smooth_vals_new"]
-                        count +=1
+                        count += 1
                         
                 else:
-                    len_env = sum(splitting_env==unique_env[i])
-                    fitted_dY_tmp = fitted_dY.reshape([L,-1]).mean(axis=1)                    
+                    len_env = sum(splitting_env == unique_env[i])
+                    fitted_dY_tmp = fitted_dY.reshape([L, -1]).mean(axis=1)
                     fit = constrained_smoothspline(Ylist[i],
-                                                  times,
-                                                  pen_degree[1],
-                                                  constraint="fixed",
-                                                  derivative_values=fitted_dY_tmp,
-                                                  initial_value=initial_values[i],
-                                                  times_new=times_new,
-                                                  num_folds=num_folds,
-                                                  lambd=lambd[i])
+                                                   times,
+                                                   pen_degree[1],
+                                                   constraint="fixed",
+                                                   derivative_values=fitted_dY_tmp,
+                                                   initial_value=initial_values[i],
+                                                   times_new=times_new,
+                                                   num_folds=num_folds,
+                                                   lambd=lambd[i])
                     RSS_B[i] = sum(fit['residuals']**2)
                     UpDown_B[i] = fit["smooth_vals"][len(fit["smooth_vals"])-1]
                     RSS3_B[i] = None
-                    if show_plot==True:
+                    if show_plot:
                         constrained_fit[i] = fit["smooth_vals_new"]
 
             ### PLOT
-            if show_plot==True:
-                if smooth_Y==False:
+            if show_plot:
+                if not smooth_Y:
                     for i in range(num_env):
                         env_ind = (splitting_env == unique_env[i])
                         Y1plot = np.array(list(Ylist[env_ind])).reshape([-1])
@@ -750,7 +799,7 @@ def CausalKinetiX_modelranking(D,
                         maxy = max(max_(tmp) for tmp in [[Y1plot], Ya[env_ind], Yb[env_ind], constrained_fit[env_ind]])
 
                         # plot
-                        plt.plot(times1, Y1plot,'o',c='black')
+                        plt.plot(times1, Y1plot, 'o', c='black')
                         plt.xlabel("times")
                         plt.ylabel("concentration")
                         plt.ylim([miny, maxy])
@@ -760,8 +809,6 @@ def CausalKinetiX_modelranking(D,
                             plt.plot(times_new, Ya[k], '-', c="red")
                             plt.plot(times_new, Yb[k], '-', c="blue")
                             plt.plot(times_new, constrained_fit[k], '-', c="green")
-                        #print(str(Ya))
-                        #readline("Press enter")
                         plt.show()
 
                 else:
@@ -774,7 +821,7 @@ def CausalKinetiX_modelranking(D,
                     miny = min(min_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
                     maxy = max(max_(tmp) for tmp in [Ylist, [Ya[i]], [Yb[i]], [constrained_fit[i]]])
                     # plot
-                    plt.plot(times1, Ylist[i],'o',c='black')
+                    plt.plot(times1, Ylist[i], 'o', c='black')
                     plt.xlabel("times")
                     plt.ylabel("concentration")
                     plt.ylim([miny, maxy])
@@ -783,11 +830,9 @@ def CausalKinetiX_modelranking(D,
                         plt.plot(times_new, Ya[k], '-', c="red")
                         plt.plot(times_new, Yb[k], '-', c="blue")
                         plt.plot(times_new, constrained_fit[k], '-', c="green")
-                    #readline("Press enter")
                     plt.show()
-                    
-                    
-                    for i in range(num.env):
+
+                    for i in range(num_env):
                         env_ind = splitting_env == unique_env[i]
                         times1 = np.array(list(times)*sum(env_ind))
                         L = len(times)
@@ -800,64 +845,41 @@ def CausalKinetiX_modelranking(D,
                         plt.plot(times_new, Ya[k], '-', c="red")
                         plt.plot(times_new, Yb[k], '-', c="blue")
                         plt.plot(times_new, constrained_fit[k], '-', c="green")
-                    #readline("Press enter")
                     plt.show()
 
         else:
             raise(Exception("Specified sample_splitting does not exist_ Use none or loo_"))
 
         ## compute score
-        if score_type=="max": 
+        if score_type == "max":
+            if np.abs(RSS_A) < 10**(-10):
+                raise(Warning("RSS of unconstrained smoother is very small (<10^-10). Using a relative score will lead to wrong results. Consider using the score.type max_absolute."))
             score = np.max((RSS_B-RSS_A)/RSS_A)
 
-        elif score_type=="mean":
+        elif score_type == "mean":
+            if np.abs(RSS_A) < 10**(-10):
+                raise(Warning("RSS of unconstrained smoother is very small (<10^-10). Using a relative score will lead to wrong results. Consider using the score.type mean_absolute."))
             score = np.mean((RSS_B-RSS_A)/RSS_A)
-# for debug
-            #print(RSS_A)
-            #print(RSS_B)
-            #print(RSS_B-RSS_A)
-        elif score_type=="mean2":
+
+        elif score_type == "mean_absolute":
             score = np.mean(RSS_B)
 
-        elif score_type=="mean_weighted":
+        elif score_type == "max_absolute":
+            score = np.max(RSS_B)
+
+        elif score_type == "mean_weighted":
+            if np.abs(RSS_A) < 10**(-10):
+                raise(Warning("RSS of unconstrained smoother is very small (<10^-10). Using a relative score will lead to wrong results. Consider using the score.type mean_absolute or max_absolute."))
             score = np.mean(weight_vec*(RSS_B-RSS_A)/RSS_A)
 
-        elif score_type=="mean_3point":
-            score = np.mean((RSS3_B-RSS3_A)/RSS3_A)
-
-        elif score_type=="second-worst":
-            tmp = (RSS_B-RSS_A)/RSS_A
-            tmp.sort(order='decreasing')
-            score = tmp[1]
-
-        elif score_type=="max-mean":
-            if smooth_Y==True:
-                score = np.max((RSS_B-RSS_A)/RSS_A)
-
-            else:
-                uenv = list(set(env))
-                n_env = len(uenv)
-                tmp = np.zeros([n_env])
-                for i in range(n_env):
-                    tmp[i] = np.mean((RSS_B[env==uenv[i]]-RSS_A[env==uenv[i]])/RSS_A[env==uenv[i]])
-
-                score = np.max(tmp)
-
-        elif score_type=="updown1":
-            score = np.max(np.abs(UpDown_A-UpDown_B))
-
-        elif score_type=="updown2":
-            score = np.mean(np.abs(UpDown_A-UpDown_B))
-
         else:
-            raise(Exception("Specified score_type does not exist_ Use max, mean or max-mean_"))
+            raise(Exception("Specified score_type does not exist."))
 
         # Output
-        if silent==False:
+        if not silent:
             print("Model has a score of {}".format(score))
 
         scores[model] = score
-
 
     ## Return results
     return(scores)

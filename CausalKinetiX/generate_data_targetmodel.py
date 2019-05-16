@@ -80,7 +80,6 @@ def generate_data_targetmodel(env=np.ones([10]),
     # Generate data
     for a in range(n_env):
         current_env = np.unique(env)[a]
-       
         # Generate random smooth predictor functions
         Xmat = np.zeros([n, d-1])
         for i in range(d-1):
@@ -88,7 +87,7 @@ def generate_data_targetmodel(env=np.ones([10]),
 
         # read out data for predictors
         noise_var2 = np.apply_along_axis(arr=Xmat, axis=0,
-                                         func1d=lambda x:noise_sd*(max(x)-min(x)))
+                                         func1d=lambda x: noise_sd*(max(x)-min(x)))
         noiseterm = np.random.randn(
             L*(d-1)*env_size[a]).reshape([env_size[a], (d-1), L]) * noise_var2.reshape([1, d-1, 1])
         noiseterm = noiseterm.reshape([env_size[a], L*(d-1)])

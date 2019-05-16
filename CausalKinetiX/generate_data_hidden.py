@@ -31,7 +31,7 @@ Examples
                                           noise=0.02,
                                           only_target_noise=False,
                                           relativ=True,
-                                          intervention="initial_blockreactions5",
+                                          intervention="initial_blockreactions",
                                           intervention_par=0.2)
 >>> D = simulation_obj["simulated_data"]
 >>> time = simulation_obj["time"]
@@ -53,6 +53,7 @@ Identifying Causal Structure in Large-Scale Kinetic Systems
 import numpy as np
 import scipy.integrate
 import numbers
+
 
 def generate_data_hidden(env=np.zeros(10),
                          L=15,
@@ -218,7 +219,8 @@ def generate_data_hidden(env=np.zeros(10),
             if relativ:
                 noise_var = noise_sd*(tmp.max(axis=0) - tmp.min(axis=0)) + 0.0000001
                 noiseterm = np.random.randn(L*d*env_size)
-                noiseterm = noiseterm.reshape([env_size, L*d]) * np.repeat(noise_var, L).reshape([1, -1])
+                noiseterm = noiseterm.reshape([env_size, L*d]) * np.repeat(noise_var,
+                                                                           L).reshape([1, -1])
             else:
                 noiseterm = np.random.randn(L*d*env_size) * np.array(list(noise_var)*L*env_size)
                 noiseterm = noiseterm.reshape([env_size, L*d])
