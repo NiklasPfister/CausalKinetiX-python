@@ -61,7 +61,7 @@ print(ck_fit)
 ###
 
 x = np.arange(0, 4, 4/200)
-x_long = np.arange(0, 4, 4/1000)
+x_long = np.arange(-1, 5, 4/1000)
 y = x**2 + np.random.normal(0, 2, 200)
 dy = 2*x
 dybdd = np.hstack([dy-0.5, dy+0.5])
